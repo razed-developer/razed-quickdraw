@@ -14,6 +14,7 @@ import {
   boundsIntersect, boundsContain,
 } from './geometry.js'
 import { strokeOutline } from './freehand.js'
+import { shapeUtil } from './shape-registry.js'
 
 export const NOTE_W = 200
 const NOTE_PAD = 20
@@ -26,6 +27,9 @@ const SEMI = { light: 'rgba(249, 247, 241, 0.85)', dark: 'rgba(32, 30, 25, 0.85)
 // ---- local bounds (origin = shape.x/y, unrotated) --------------------------
 
 export function localBounds(shape) {
+  const custom = shapeUtil(shape.type)
+  if (custom?.bounds) return custom.bounds(shape)
+
   const p = shape.props
   switch (shape.type) {
     case 'draw':
@@ -344,6 +348,13 @@ export function drawShape(ctx, shape, opts) {
   }
   ctx.translate(shape.x, shape.y)
 
+  const custom = shapeUtil(shape.type)
+  if (custom?.draw) {
+    custom.draw(ctx, shape, opts)
+    ctx.restore()
+    return
+  }
+
   switch (shape.type) {
     case 'draw': {
       // 'draw' dash = pressure ink; solid/dashed/dotted render the same
@@ -494,6 +505,9 @@ export function hitShape(shape, px, py, tol, store) {
   const wide = tol + SIZES[shape.props.size || 'm'] * 2
   if (!boundsContain({ x: b.x - wide, y: b.y - wide, w: b.w + wide * 2, h: b.h + wide * 2 }, px, py)) return false
   const l = toLocal(shape, px, py)
+  const custom = shapeUtil(shape.type)
+  if (custom?.hit) return custom.hit(shape, l, tol, store)
+
   const p = shape.props
   switch (shape.type) {
     case 'draw':
@@ -555,6 +569,9 @@ export const sampleLinePts = (p, bend) => {
 export function marqueeHits(shape, rect) {
   const b = pageBounds(shape)
   if (!boundsIntersect(b, rect)) return false
+
+  const custom = shapeUtil(shape.type)
+  if (custom?.marquee) return custom.marquee(shape, rect)
   // solid-bodied shapes select on bounds overlap
   if (['text', 'note', 'image'].includes(shape.type)) return true
   if (shape.type === 'geo' && shape.props.fill !== 'none') return true
@@ -584,6 +601,9 @@ export function marqueeHits(shape, rect) {
 // scale a shape's local geometry about the LOCAL origin; caller repositions
 // x/y. Returns a new shape.
 export function scaleShape(shape, sx, sy) {
+  const custom = shapeUtil(shape.type)
+  if (custom?.resize) return custom.resize(shape, sx, sy)
+
   const p = shape.props
   switch (shape.type) {
     case 'draw':
