@@ -1457,11 +1457,11 @@ export class Editor {
   // Renders the drawing into a PNG at crisp resolution — with the paper
   // behind it, or on transparency. Everything by default; pass ids (a Set)
   // to export just those shapes.
-  async exportImage({ background = true, scale = 2, margin = 48, ids = null } = {}) {
-    let b = null
+  async exportImage({ background = true, scale = 2, margin = 48, ids = null, bounds = null } = {}) {
+    let b = bounds ? { ...bounds } : null
     const shapes = this.shapesSorted().filter((s) => !ids || ids.has(s.id))
-    for (const s of shapes) b = boundsUnion(b, pageBounds(s))
-    if (!b) return null
+    if (!bounds) for (const s of shapes) b = boundsUnion(b, pageBounds(s))
+    if (!b || b.w <= 0 || b.h <= 0) return null
     b = boundsExpand(b, margin)
     // stay under ~24MP however big the drawing is
     const cap = Math.sqrt(24e6 / (b.w * b.h))
