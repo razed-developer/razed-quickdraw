@@ -286,7 +286,7 @@ export class Editor {
   pickImage(): void
 
   /** Render the drawing to a PNG blob (null when the board is empty). */
-  exportImage(opts?: { background?: boolean; scale?: number; margin?: number; ids?: Set<string> | null }): Promise<Blob | null>
+  exportImage(opts?: { background?: boolean; scale?: number; margin?: number; ids?: Set<string> | null; bounds?: Bounds | null }): Promise<Blob | null>
 
   // rendering
   requestRender(): void
