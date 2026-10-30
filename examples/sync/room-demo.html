@@ -16,6 +16,8 @@ section h2{font-size:14px;padding:10px;margin:0;border-bottom:1px solid #dde6e6}
 button{cursor:pointer;padding:7px 10px}
 .status{font-weight:normal;color:#53686b}
 @media(max-width:850px){main{grid-template-columns:1fr}.board{height:50vh}}
+#recovery{margin-top:12px;background:#fff;border:2px solid #b07824;padding:14px;display:none}
+#recovery button{margin:5px}
 </style>
 </head>
 <body>
@@ -29,14 +31,24 @@ button{cursor:pointer;padding:7px 10px}
 <section><h2>Participant A · <span class="status" id="status-a">connecting</span></h2><div id="board-a" class="board"></div></section>
 <section><h2>Participant B · <span class="status" id="status-b">connecting</span></h2><div id="board-b" class="board"></div></section>
 </main>
+<div id="recovery" role="region" aria-label="Synchronization recovery"><strong>Unsynchronized drawing detected</strong><p id="recovery-description"></p><button id="keep-local">Keep local work (safe merge)</button><button id="use-server">Use saved server version</button><button id="export-local">Export local backup</button><button id="dismiss-recovery">Leave unresolved</button></div>
 <p id="notice" role="status">Changes made while disconnected require explicit conflict resolution. This is a local development demo, not a production service.</p>
 <script type="module">
 import { createQuickdraw } from '/core/index.js'
 import { connectRoom } from '/room-client.mjs'
 const connections = []
 const boards = []
+let activeRecovery = null
+const recoveryPanel = document.getElementById('recovery')
+function hideRecovery(){ recoveryPanel.style.display='none'; activeRecovery=null }
+function downloadSnapshot(snapshot){ const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});const href=URL.createObjectURL(blob);const a=document.createElement('a');a.href=href;a.download='quickdraw-local-backup-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(href),1000) }
+document.getElementById('export-local').onclick=()=>{if(activeRecovery) downloadSnapshot(activeRecovery.connection.exportLocal())}
+document.getElementById('dismiss-recovery').onclick=hideRecovery
+document.getElementById('use-server').onclick=()=>{if(activeRecovery && activeRecovery.connection.acceptServer(activeRecovery.snapshot,activeRecovery.revision)) hideRecovery()}
+document.getElementById('keep-local').onclick=()=>{if(!activeRecovery)return;const result=activeRecovery.connection.mergeLocal();if(result.ok)hideRecovery();else document.getElementById('recovery-description').textContent=result.reason==='overlap'?`Overlapping edits in ${result.conflicts.length} records. Export your backup before choosing a version.`:'Reconnect to the server before merging.'}
 const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`
 function start() {
+  hideRecovery()
   for(const connection of connections.splice(0)) connection.disconnect()
   for(const board of boards.splice(0)) board.destroy?.()
   const room = document.getElementById('room').value.trim()
@@ -51,7 +63,9 @@ function start() {
       onConflict: ({snapshot,revision,pending}) => {
         const notice = document.getElementById('notice')
         notice.textContent = `Participant ${name.toUpperCase()} has ${pending.length} pending changes. Server revision ${revision}. Resolve before continuing.`
-        if(confirm('A conflict occurred. Discard local unconfirmed edits and load the server document?')) connection.acceptServer(snapshot,revision)
+        activeRecovery = {connection,snapshot,revision}
+        document.getElementById('recovery-description').textContent = `Participant ${name.toUpperCase()} has ${pending.length} pending changes. Export a backup before discarding local work.`
+        recoveryPanel.style.display='block'
       }
     })
     connections.push(connection)
