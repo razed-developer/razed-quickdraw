@@ -31,3 +31,13 @@ SQA Live's snapshot merging is a prototype, not a general conflict-resolution al
 ## Test commands
 
 From the repository root: `npm test` (includes the sync example's Node tests), `npm run typecheck`, and `npm run dev:sync` for the browser demo. The tests exercise the store/relay protocol, not rendered camera behaviour; independent panning still requires a browser-level test.
+
+## Revisioned room relay prototype
+
+`examples/sync/room-server.mjs` is a **separate, opt-in server** alongside the original minimal broadcast relay. It holds a separate in-memory `Store` and monotonically increasing revision for each named room.
+
+Protocol: `join { room }` returns `snapshot { revision, snapshot }`; `diff { baseRevision, diff }` broadcasts `diff { revision, diff }` to all peers (including sender) if the revision matches. A stale write receives `conflict { revision, snapshot }` and is **not applied**. `resync` returns the current snapshot. This is a deliberate safety-first conflict policy, not automatic offline merging.
+
+Tests in `examples/sync/room-server.test.mjs` cover late join, room isolation, stale-write rejection and reconnect state retention. The original `npm run dev:sync` browser demo still uses `relay.mjs`; a client adapter for the revisioned protocol and browser-level validation are the next tasks.
+
+**Not production-ready:** the example has no authentication, authorization, persistence across server restarts, bounded room retention, trusted input schema, rate limiting or multi-process coordination. Do not expose it to the public internet. In particular, a client must wait for the server's acknowledged revision before sending its next edit, or implement a properly ordered queue; offline edits require explicit conflict resolution.
