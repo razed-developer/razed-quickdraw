@@ -9,6 +9,7 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
   let stopped = false
   let pending = []
   let conflicted = false
+  let hasSynced = false
   const clientId = Math.random().toString(36).slice(2) + Date.now().toString(36)
   let reconnectDelay = 250
   let retryTimer = null
@@ -49,13 +50,17 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
         revision = msg.revision
         awaiting = false
         // Never replace locally edited content without an explicit decision.
-        if (pending.length) {
+        const local = store.getSnapshot()
+        const localHasRecords = Object.keys(local.records || local).length > 0
+        const remoteHasRecords = Object.keys(msg.snapshot?.records || msg.snapshot || {}).length > 0
+        if (pending.length || (hasSynced && localHasRecords && !remoteHasRecords)) {
           conflicted = true
           status('conflict')
           onConflict({ snapshot: msg.snapshot, revision, pending: pending.slice() })
           return
         }
         store.loadSnapshot(msg.snapshot, 'remote')
+        hasSynced = true
         status('connected')
         pump()
       } else if (msg.type === 'diff' && Number.isSafeInteger(msg.revision)) {
@@ -112,6 +117,7 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
     acceptServer(snapshot, nextRevision) {
       if (!conflicted || !Number.isSafeInteger(nextRevision)) return false
       store.loadSnapshot(snapshot, 'remote')
+      hasSynced = true
       revision = nextRevision
       pending = []
       awaiting = false
