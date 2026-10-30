@@ -13,6 +13,11 @@ main{display:grid;grid-template-columns:1fr 1fr;gap:12px}
 section{background:white;border:1px solid #aabfc0;min-width:0}
 section h2{font-size:14px;padding:10px;margin:0;border-bottom:1px solid #dde6e6}
 .board{height:68vh;min-height:400px;position:relative}
+.presence-layer{position:absolute;inset:0;pointer-events:none;overflow:hidden;z-index:8}
+.presence-outline{position:absolute;border:2px dashed #2563eb;background:#2563eb12;box-sizing:border-box;pointer-events:none}
+.presence-outline span{position:absolute;top:0;left:0;background:#2563eb;color:white;padding:2px 5px;font:12px system-ui}
+.presence-arrow{position:absolute;pointer-events:auto;background:#2563eb;color:white;border:1px solid white;border-radius:16px;padding:5px 9px;font:12px system-ui;box-shadow:0 1px 5px #0004;transform:translate(-50%,-50%)}
+
 button{cursor:pointer;padding:7px 10px}
 .status{font-weight:normal;color:#53686b}
 @media(max-width:850px){main{grid-template-columns:1fr}.board{height:50vh}}
@@ -40,6 +45,7 @@ const connections = []
 const boards = []
 const follow = {a:false,b:false}
 const cameras = {a:null,b:null}
+const presence = {a:null,b:null}
 let cameraCleanups = []
 let activeRecovery = null
 const recoveryPanel = document.getElementById('recovery')
@@ -83,6 +89,7 @@ function start() {
   hideRecovery()
   for(const cleanup of cameraCleanups.splice(0)) cleanup()
   follow.a=false;follow.b=false
+  cameras.a=cameras.b=null
   for(const connection of connections.splice(0)) connection.disconnect()
   for(const board of boards.splice(0)) board.destroy?.()
   const room = document.getElementById('room').value.trim()
@@ -91,6 +98,51 @@ function start() {
     document.getElementById(`board-${name}`).replaceChildren()
     const board = createQuickdraw({ container: document.getElementById(`board-${name}`), theme:'light', grid:'dots', watermark:false })
     boards.push(board)
+    const layer=document.createElement('div')
+    layer.className='presence-layer'
+    layer.setAttribute('aria-label','Other participant viewport')
+    board.editor.container.append(layer)
+    presence[name]=layer
+    const renderPresence=()=>{
+      layer.replaceChildren()
+      const b=cameras[name]
+      if(!b || !Number.isFinite(b.x+b.y+b.w+b.h) || b.w<=0 || b.h<=0)return
+      const editor=board.editor
+      const {w,h}=editor.viewSize()
+      if(w<=1||h<=1)return
+      const a=editor.pageToScreen(b.x,b.y)
+      const z=editor.camera.z
+      const rect={x:a.x,y:a.y,w:b.w*z,h:b.h*z}
+      const label=name==='a'?'B':'A'
+      const center={x:rect.x+rect.w/2,y:rect.y+rect.h/2}
+      const visible=rect.x<w && rect.x+rect.w>0 && rect.y<h && rect.y+rect.h>0
+      if(visible){
+        const outline=document.createElement('div')
+        outline.className='presence-outline'
+        Object.assign(outline.style,{left:rect.x+'px',top:rect.y+'px',width:rect.w+'px',height:rect.h+'px'})
+        const tag=document.createElement('span');tag.textContent='Participant '+label
+        outline.append(tag);layer.append(outline)
+      } else {
+        const dx=center.x-w/2,dy=center.y-h/2
+        const margin=32
+        const scale=Math.min((w/2-margin)/Math.max(Math.abs(dx),1),(h/2-margin)/Math.max(Math.abs(dy),1))
+        const x=w/2+dx*scale,y=h/2+dy*scale
+        const arrow=document.createElement('button')
+        arrow.type='button'
+        arrow.className='presence-arrow'
+        arrow.style.left=x+'px';arrow.style.top=y+'px'
+        const angle=Math.atan2(dy,dx)
+        const directions=['→','↘','↓','↙','←','↖','↑','↗']
+        const direction=directions[(Math.round(angle/(Math.PI/4))+8)%8]
+        arrow.textContent=direction+' '+label
+        arrow.title='Go to participant '+label+' (does not enable Follow)'
+        arrow.setAttribute('aria-label',arrow.title)
+        arrow.onclick=()=>editor.followBounds(b,{animate:300})
+        layer.append(arrow)
+      }
+    }
+    cameraCleanups.push(board.editor.on('camera',renderPresence))
+    cameraCleanups.push(()=>{presence[name]=null;layer.remove()})
     const setFollow = enabled => {
       follow[name] = enabled
       document.getElementById(`follow-${name}`).textContent = `Follow ${name==='a'?'B':'A'}: ${enabled?'On':'Off'}`
@@ -117,12 +169,12 @@ function start() {
     document.getElementById(`follow-${name}`).textContent=`Follow ${name==='a'?'B':'A'}: Off`
     const connection = connectRoom({
       participant:name.toUpperCase(),
-      onCamera: message => { cameras[name]=message.bounds; if(follow[name]) board.editor.followBounds(message.bounds) },
+      onCamera: message => { cameras[name]=message.bounds; if(follow[name]) board.editor.followBounds(message.bounds); renderPresence() },
       onCall: message => {
         const target=document.getElementById(`invite-${name}`)
         target.replaceChildren()
         const label=document.createElement('span');label.textContent=`Participant ${message.from} invites you to their view. `
-        const go=document.createElement('button');go.textContent='Go to view';go.onclick=()=>{cameras[name]=message.bounds;setFollow(true);target.replaceChildren()}
+        const go=document.createElement('button');go.textContent='Go to view';go.onclick=()=>{cameras[name]=message.bounds;setFollow(true);renderPresence();target.replaceChildren()}
         const dismiss=document.createElement('button');dismiss.textContent='Dismiss';dismiss.onclick=()=>target.replaceChildren()
         target.append(label,go,dismiss)
       },
