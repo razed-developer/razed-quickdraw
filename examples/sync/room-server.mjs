@@ -130,3 +130,12 @@ export function createRoomSyncServer() {
     },
   }
 }
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  const app = createRoomSyncServer()
+  const address = await app.listen(Number(process.env.PORT || 8081))
+  console.log(`Razed Quickdraw room lab: http://127.0.0.1:${address.port}/demo`)
+  const stop = async () => { await app.close(); process.exit(0) }
+  process.once('SIGINT', stop)
+  process.once('SIGTERM', stop)
+}
