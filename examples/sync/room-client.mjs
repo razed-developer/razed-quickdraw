@@ -60,7 +60,7 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
         const local = store.getSnapshot()
         const localHasRecords = Object.keys(local.document?.store || {}).length > 0
         const remoteHasRecords = Object.keys(msg.snapshot?.document?.store || {}).length > 0
-        if (pending.length || (hasSynced && localHasRecords && !remoteHasRecords)) {
+        if (pending.length || conflicted || (hasSynced && localHasRecords && !remoteHasRecords)) {
           conflicted = true
           status('conflict')
           recovery = { snapshot: msg.snapshot, revision, base: frozenBase || confirmedSnapshot, local: local }
@@ -76,6 +76,15 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
         status('connected')
         pump()
       } else if (msg.type === 'diff' && Number.isSafeInteger(msg.revision)) {
+        if (conflicted) {
+          // A peer may commit while the recovery panel is open. Never merge
+          // against the stale server revision shown in that panel.
+          if (recovery) {
+            status('resyncing')
+            send({ type: 'resync' })
+          }
+          return
+        }
         if (revision === null) return
         if (msg.revision !== revision + 1) {
           status('resyncing')
@@ -154,7 +163,7 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
     },
     mergeLocal() {
       if (!conflicted || !recovery || !socket || socket.readyState !== WebSocketImpl.OPEN) return { ok: false, reason: 'not-ready' }
-      const result = mergeSnapshots(recovery.base, recovery.local, recovery.snapshot)
+      const result = mergeSnapshots(recovery.base, store.getSnapshot(), recovery.snapshot)
       if (result.conflicts.length) return { ok: false, reason: 'overlap', conflicts: result.conflicts }
       const diff = snapshotDiff(recovery.snapshot, result.snapshot)
       store.loadSnapshot(result.snapshot, 'remote')
