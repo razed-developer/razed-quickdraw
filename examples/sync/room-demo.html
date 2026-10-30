@@ -28,8 +28,8 @@ button{cursor:pointer;padding:7px 10px}
 <button id="restart">Connect room</button></div>
 </header>
 <main>
-<section><h2>Participant A · <span class="status" id="status-a">connecting</span></h2><div id="board-a" class="board"></div></section>
-<section><h2>Participant B · <span class="status" id="status-b">connecting</span></h2><div id="board-b" class="board"></div></section>
+<section><h2>Participant A · <span class="status" id="status-a">connecting</span></h2><div id="board-a" class="board"></div><button id="follow-a">Follow B: Off</button><button id="call-a">Call B here</button><p id="invite-a"></p></section>
+<section><h2>Participant B · <span class="status" id="status-b">connecting</span></h2><div id="board-b" class="board"></div><button id="follow-b">Follow A: Off</button><button id="call-b">Call A here</button><p id="invite-b"></p></section>
 </main>
 <div id="recovery" role="region" aria-label="Synchronization recovery"><strong>Unsynchronized drawing detected</strong><p id="recovery-description"></p><button id="keep-local">Keep local work (safe merge)</button><div id="record-conflicts"></div><button id="use-server">Use saved server version</button><button id="export-local">Export local backup</button><button id="dismiss-recovery">Leave unresolved</button></div>
 <p id="notice" role="status">Changes made while disconnected require explicit conflict resolution. This is a local development demo, not a production service.</p>
@@ -38,6 +38,9 @@ import { createQuickdraw } from '/core/index.js'
 import { connectRoom } from '/room-client.mjs'
 const connections = []
 const boards = []
+const follow = {a:false,b:false}
+const cameras = {a:null,b:null}
+let cameraCleanups = []
 let activeRecovery = null
 const recoveryPanel = document.getElementById('recovery')
 function hideRecovery(){ recoveryPanel.style.display='none'; activeRecovery=null; document.getElementById('record-conflicts').replaceChildren() }
@@ -78,6 +81,8 @@ document.getElementById('keep-local').onclick=()=>{
 const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`
 function start() {
   hideRecovery()
+  for(const cleanup of cameraCleanups.splice(0)) cleanup()
+  follow.a=false;follow.b=false
   for(const connection of connections.splice(0)) connection.disconnect()
   for(const board of boards.splice(0)) board.destroy?.()
   const room = document.getElementById('room').value.trim()
@@ -86,7 +91,18 @@ function start() {
     document.getElementById(`board-${name}`).replaceChildren()
     const board = createQuickdraw({ container: document.getElementById(`board-${name}`), theme:'light', grid:'dots', watermark:false })
     boards.push(board)
+    document.getElementById(`follow-${name}`).textContent=`Follow ${name==='a'?'B':'A'}: Off`
     const connection = connectRoom({
+      participant:name.toUpperCase(),
+      onCamera: message => { cameras[name]=message.bounds; if(follow[name]) board.editor.followBounds(message.bounds) },
+      onCall: message => {
+        const target=document.getElementById(`invite-${name}`)
+        target.replaceChildren()
+        const label=document.createElement('span');label.textContent=`Participant ${message.from} invites you to their view. `
+        const go=document.createElement('button');go.textContent='Go to view';go.onclick=()=>{board.editor.followBounds(message.bounds,{animate:300});target.replaceChildren()}
+        const dismiss=document.createElement('button');dismiss.textContent='Dismiss';dismiss.onclick=()=>target.replaceChildren()
+        target.append(label,go,dismiss)
+      },
       store: board.editor.store, url, room,
       onStatus: status => { document.getElementById(`status-${name}`).textContent = status },
       onConflict: ({snapshot,revision,pending}) => {
@@ -99,6 +115,21 @@ function start() {
       }
     })
     connections.push(connection)
+    const followButton=document.getElementById(`follow-${name}`)
+    followButton.onclick=()=>{
+      follow[name]=!follow[name]
+      followButton.textContent=`Follow ${name==='a'?'B':'A'}: ${follow[name]?'On':'Off'}`
+      if(follow[name] && cameras[name]) board.editor.followBounds(cameras[name])
+    }
+    document.getElementById(`call-${name}`).onclick=()=>connection.callParticipant(board.editor.viewportPageBounds())
+    let last=0
+    cameraCleanups.push(board.editor.on('camera',()=>{
+      const now=Date.now()
+      if(now-last<100)return
+      last=now
+      connection.sendCamera(board.editor.viewportPageBounds())
+    }))
+    connection.sendCamera(board.editor.viewportPageBounds())
   }
 }
 document.getElementById('restart').addEventListener('click',start)
