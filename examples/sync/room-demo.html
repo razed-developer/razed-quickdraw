@@ -31,7 +31,7 @@ button{cursor:pointer;padding:7px 10px}
 <section><h2>Participant A · <span class="status" id="status-a">connecting</span></h2><div id="board-a" class="board"></div></section>
 <section><h2>Participant B · <span class="status" id="status-b">connecting</span></h2><div id="board-b" class="board"></div></section>
 </main>
-<div id="recovery" role="region" aria-label="Synchronization recovery"><strong>Unsynchronized drawing detected</strong><p id="recovery-description"></p><button id="keep-local">Keep local work (safe merge)</button><button id="use-server">Use saved server version</button><button id="export-local">Export local backup</button><button id="dismiss-recovery">Leave unresolved</button></div>
+<div id="recovery" role="region" aria-label="Synchronization recovery"><strong>Unsynchronized drawing detected</strong><p id="recovery-description"></p><button id="keep-local">Keep local work (safe merge)</button><div id="record-conflicts"></div><button id="use-server">Use saved server version</button><button id="export-local">Export local backup</button><button id="dismiss-recovery">Leave unresolved</button></div>
 <p id="notice" role="status">Changes made while disconnected require explicit conflict resolution. This is a local development demo, not a production service.</p>
 <script type="module">
 import { createQuickdraw } from '/core/index.js'
@@ -40,12 +40,41 @@ const connections = []
 const boards = []
 let activeRecovery = null
 const recoveryPanel = document.getElementById('recovery')
-function hideRecovery(){ recoveryPanel.style.display='none'; activeRecovery=null }
+function hideRecovery(){ recoveryPanel.style.display='none'; activeRecovery=null; document.getElementById('record-conflicts').replaceChildren() }
 function downloadSnapshot(snapshot){ const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});const href=URL.createObjectURL(blob);const a=document.createElement('a');a.href=href;a.download='quickdraw-local-backup-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(href),1000) }
 document.getElementById('export-local').onclick=()=>{if(activeRecovery) downloadSnapshot(activeRecovery.connection.exportLocal())}
 document.getElementById('dismiss-recovery').onclick=hideRecovery
 document.getElementById('use-server').onclick=()=>{if(activeRecovery && activeRecovery.connection.acceptServer(activeRecovery.snapshot,activeRecovery.revision)) hideRecovery()}
-document.getElementById('keep-local').onclick=()=>{if(!activeRecovery)return;const result=activeRecovery.connection.mergeLocal();if(result.ok)hideRecovery();else document.getElementById('recovery-description').textContent=result.reason==='overlap'?`Overlapping edits in ${result.conflicts.length} records. Export your backup before choosing a version.`:'Reconnect to the server before merging.'}
+function showOverlaps(ids) {
+  const container=document.getElementById('record-conflicts')
+  container.replaceChildren()
+  if(!ids.length)return
+  const title=document.createElement('p')
+  title.textContent=`${ids.length} overlapping object(s). Choose which version to keep for each object:`
+  container.append(title)
+  for(const id of ids) {
+    const row=document.createElement('label')
+    row.style.display='block'
+    row.textContent=id+' '
+    const select=document.createElement('select')
+    select.dataset.recordId=id
+    for(const [value,label] of [['','Choose version'],['local','My version'],['server','Server version']]) {
+      const option=document.createElement('option');option.value=value;option.textContent=label;select.append(option)
+    }
+    row.append(select);container.append(row)
+  }
+}
+document.getElementById('keep-local').onclick=()=>{
+  if(!activeRecovery)return
+  const choices={}
+  for(const select of document.querySelectorAll('#record-conflicts select')) if(select.value) choices[select.dataset.recordId]=select.value
+  const result=activeRecovery.connection.mergeLocal(choices)
+  if(result.ok)hideRecovery()
+  else if(result.reason==='overlap') {
+    showOverlaps(result.conflicts)
+    document.getElementById('recovery-description').textContent='Overlapping edits detected. Export a backup, then choose which version to keep for each object.'
+  } else document.getElementById('recovery-description').textContent='Reconnect to the server before merging.'
+}
 const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`
 function start() {
   hideRecovery()
@@ -64,6 +93,7 @@ function start() {
         const notice = document.getElementById('notice')
         notice.textContent = `Participant ${name.toUpperCase()} has ${pending.length} pending changes. Server revision ${revision}. Resolve before continuing.`
         activeRecovery = {connection,snapshot,revision}
+        document.getElementById('record-conflicts').replaceChildren()
         document.getElementById('recovery-description').textContent = `Participant ${name.toUpperCase()} has ${pending.length} pending changes. Export a backup before discarding local work.`
         recoveryPanel.style.display='block'
       }
