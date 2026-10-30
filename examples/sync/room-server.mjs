@@ -2,6 +2,10 @@
 // The SDK itself has no network dependency. This example deliberately rejects
 // stale revisions rather than silently overwriting concurrent edits.
 import { createServer } from 'node:http'
+import { createReadStream } from 'node:fs'
+import { stat } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { WebSocket, WebSocketServer } from 'ws'
 import { Store } from '../../packages/core/src/store.js'
 
@@ -9,7 +13,32 @@ const MAX_MESSAGE_BYTES = 1024 * 1024
 const ROOM_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/
 
 export function createRoomSyncServer() {
-  const http = createServer((_, res) => res.writeHead(404).end())
+  const directory = dirname(fileURLToPath(import.meta.url))
+  const root = resolve(directory, '../..')
+  const assets = new Map([
+    ['/demo', [resolve(directory, 'room-demo.html'), 'text/html; charset=utf-8']],
+    ['/room-client.mjs', [resolve(directory, 'room-client.mjs'), 'text/javascript; charset=utf-8']],
+    ['/core/index.js', [resolve(root, 'packages/core/src/index.js'), 'text/javascript; charset=utf-8']],
+    ['/core/store.js', [resolve(root, 'packages/core/src/store.js'), 'text/javascript; charset=utf-8']],
+  ])
+  // The browser SDK imports other core modules. Only serve the explicit core
+  // directory and demo assets; do not expose arbitrary repository files.
+  const http = createServer(async (req, res) => {
+    if (req.method !== 'GET') { res.writeHead(405).end(); return }
+    const pathname = new URL(req.url, 'http://localhost').pathname
+    let asset = assets.get(pathname)
+    if (!asset && /^\\/core\\/[a-zA-Z0-9_-]+\\.js$/.test(pathname)) {
+      asset = [resolve(root, 'packages/core/src', pathname.slice('/core/'.length)), 'text/javascript; charset=utf-8']
+    }
+    if (pathname === '/core/quickdraw.css') asset = [resolve(root, 'packages/core/src/quickdraw.css'), 'text/css; charset=utf-8']
+    if (!asset) { res.writeHead(404).end(); return }
+    try {
+      const info = await stat(asset[0])
+      if (!info.isFile()) throw new Error('not file')
+      res.writeHead(200, { 'Content-Type': asset[1], 'Content-Length': info.size })
+      createReadStream(asset[0]).pipe(res)
+    } catch { res.writeHead(404).end() }
+  })
   const wss = new WebSocketServer({ server: http, maxPayload: MAX_MESSAGE_BYTES })
   const rooms = new Map()
 
