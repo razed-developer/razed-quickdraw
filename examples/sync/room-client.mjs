@@ -67,6 +67,15 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
           send({ type: 'resync' })
           return
         }
+        if (awaiting && msg.clientId !== clientId) {
+          // Another writer advanced the server while our write was in flight.
+          // Resync rather than pretending our pending edit was accepted.
+          revision = null
+          awaiting = false
+          status('resyncing')
+          send({ type: 'resync' })
+          return
+        }
         if (msg.clientId === clientId) {
           // Acknowledged local edit: it is already present in this store.
           pending.shift()
