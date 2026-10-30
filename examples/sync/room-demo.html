@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Razed Quickdraw · Room Sync Lab</title>
+<link rel="stylesheet" href="/core/quickdraw.css">
+<style>
+body{font:14px system-ui;margin:0;padding:16px;background:#edf2f2;color:#142e32}
+header{display:flex;gap:20px;align-items:center;justify-content:space-between;flex-wrap:wrap;margin-bottom:12px}
+h1{font-size:20px;margin:0}p{margin:4px 0;color:#52666a}
+main{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+section{background:white;border:1px solid #aabfc0;min-width:0}
+section h2{font-size:14px;padding:10px;margin:0;border-bottom:1px solid #dde6e6}
+.board{height:68vh;min-height:400px;position:relative}
+button{cursor:pointer;padding:7px 10px}
+.status{font-weight:normal;color:#53686b}
+@media(max-width:850px){main{grid-template-columns:1fr}.board{height:50vh}}
+</style>
+</head>
+<body>
+<header>
+<div><h1>Razed Quickdraw · Collaboration Lab</h1>
+<p>Two separate editors, one shared document. Pan and zoom independently.</p></div>
+<div><label>Room <input id="room" value="demo" maxlength="64"></label>
+<button id="restart">Connect room</button></div>
+</header>
+<main>
+<section><h2>Participant A · <span class="status" id="status-a">connecting</span></h2><div id="board-a" class="board"></div></section>
+<section><h2>Participant B · <span class="status" id="status-b">connecting</span></h2><div id="board-b" class="board"></div></section>
+</main>
+<p id="notice" role="status">Changes made while disconnected require explicit conflict resolution. This is a local development demo, not a production service.</p>
+<script type="module">
+import { createQuickdraw } from '/core/index.js'
+import { connectRoom } from '/room-client.mjs'
+const connections = []
+const boards = []
+const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`
+function start() {
+  for(const connection of connections.splice(0)) connection.disconnect()
+  for(const board of boards.splice(0)) board.destroy?.()
+  const room = document.getElementById('room').value.trim()
+  if(!/^[a-zA-Z0-9_-]{1,64}$/.test(room)) { alert('Use 1–64 letters, digits, _ or -'); return }
+  for(const name of ['a','b']) {
+    document.getElementById(`board-${name}`).replaceChildren()
+    const board = createQuickdraw({ container: document.getElementById(`board-${name}`), theme:'light', grid:'dots', watermark:false })
+    boards.push(board)
+    const connection = connectRoom({
+      store: board.editor.store, url, room,
+      onStatus: status => { document.getElementById(`status-${name}`).textContent = status },
+      onConflict: ({snapshot,revision,pending}) => {
+        const notice = document.getElementById('notice')
+        notice.textContent = `Participant ${name.toUpperCase()} has ${pending.length} pending changes. Server revision ${revision}. Resolve before continuing.`
+        if(confirm('A conflict occurred. Discard local unconfirmed edits and load the server document?')) connection.acceptServer(snapshot,revision)
+      }
+    })
+    connections.push(connection)
+  }
+}
+document.getElementById('restart').addEventListener('click',start)
+start()
+</script>
+</body></html>
