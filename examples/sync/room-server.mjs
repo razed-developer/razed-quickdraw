@@ -2,9 +2,9 @@
 // The SDK itself has no network dependency. This example deliberately rejects
 // stale revisions rather than silently overwriting concurrent edits.
 import { createServer } from 'node:http'
-import { createReadStream } from 'node:fs'
+import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { stat } from 'node:fs/promises'
-import { dirname, resolve } from 'node:path'
+import { dirname, resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocket, WebSocketServer } from 'ws'
 import { Store } from '../../packages/core/src/store.js'
@@ -12,7 +12,8 @@ import { Store } from '../../packages/core/src/store.js'
 const MAX_MESSAGE_BYTES = 1024 * 1024
 const ROOM_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/
 
-export function createRoomSyncServer() {
+export function createRoomSyncServer({ dataDir = resolve(dirname(fileURLToPath(import.meta.url)), '.room-data') } = {}) {
+  mkdirSync(dataDir, { recursive: true })
   const directory = dirname(fileURLToPath(import.meta.url))
   const root = resolve(directory, '../..')
   const assets = new Map([
@@ -50,6 +51,13 @@ export function createRoomSyncServer() {
     let room = rooms.get(name)
     if (!room) {
       room = { store: new Store(), revision: 0, peers: new Set() }
+      const file = join(dataDir, name + '.json')
+      if (existsSync(file)) {
+        const saved = JSON.parse(readFileSync(file, 'utf8'))
+        if (!Number.isSafeInteger(saved.revision) || saved.revision < 0) throw new Error('Invalid saved room revision')
+        room.store.loadSnapshot(saved.snapshot, 'remote')
+        room.revision = saved.revision
+      }
       rooms.set(name, room)
     }
     return room
@@ -96,15 +104,22 @@ export function createRoomSyncServer() {
         send(socket, { type: 'error', code: 'invalid-diff' })
         return
       }
+      // Persist before acknowledging. Keep a pre-change snapshot so a disk
+      // failure cannot be mistaken for a committed edit.
+      const previous = joined.store.getSnapshot()
+      const previousRevision = joined.revision
       try {
         joined.store.applyDiff(diff, 'remote')
+        const file = join(dataDir, [...rooms].find(([, value]) => value === joined)[0] + '.json')
+        const temp = file + '.tmp'
+        writeFileSync(temp, JSON.stringify({ revision: previousRevision + 1, snapshot: joined.store.getSnapshot() }))
+        renameSync(temp, file)
+        joined.revision = previousRevision + 1
       } catch {
-        // Do not continue after a potentially partial mutation.
-        send(socket, { type: 'error', code: 'apply-failed' })
-        socket.close(1011, 'Room state requires restart')
+        joined.store.loadSnapshot(previous, 'remote')
+        send(socket, { type: 'error', code: 'persistence-failed' })
         return
       }
-      joined.revision++
       const packet = { type: 'diff', revision: joined.revision, diff, clientId: typeof msg.clientId === 'string' ? msg.clientId : null }
       for (const peer of joined.peers) send(peer, packet)
     })
