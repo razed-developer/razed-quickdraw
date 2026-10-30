@@ -2,7 +2,7 @@ import { mergeSnapshots, snapshotDiff } from './room-merge.mjs'
 // Optional revision-aware client adapter for the room-server example.
 // No camera state or application roles are synchronized.
 // The server is authoritative; unsent edits are never silently replayed.
-export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSocket, onStatus = () => {}, onConflict = () => {} }) {
+export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSocket, onStatus = () => {}, onConflict = () => {}, onCamera = () => {}, onCall = () => {}, participant = '' }) {
   if (!store || !url || !room || !WebSocketImpl) throw new Error('store, url, room and WebSocket required')
   let socket = null
   let revision = null
@@ -53,6 +53,8 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
       if (stopped || socket !== current) return
       let msg
       try { msg = JSON.parse(String(event.data)) } catch { return }
+      if (msg.type === 'camera') { onCamera(msg); return }
+      if (msg.type === 'call') { onCall(msg); return }
       if (msg.type === 'snapshot' && Number.isSafeInteger(msg.revision)) {
         revision = msg.revision
         awaiting = false
@@ -158,6 +160,8 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
       status('connected')
       return true
     },
+    sendCamera(bounds) { return send({type:'camera',from:participant,bounds}) },
+    callParticipant(bounds) { return send({type:'call',from:participant,bounds}) },
     exportLocal() {
       return store.getSnapshot()
     },
