@@ -27,7 +27,7 @@ export function createRoomSyncServer() {
     if (req.method !== 'GET') { res.writeHead(405).end(); return }
     const pathname = new URL(req.url, 'http://localhost').pathname
     let asset = assets.get(pathname)
-    if (!asset && /^\\/core\\/[a-zA-Z0-9_-]+\\.js$/.test(pathname)) {
+    if (!asset && /^\/core\/[a-zA-Z0-9_-]+\.js$/.test(pathname)) {
       asset = [resolve(root, 'packages/core/src', pathname.slice('/core/'.length)), 'text/javascript; charset=utf-8']
     }
     if (pathname === '/core/quickdraw.css') asset = [resolve(root, 'packages/core/src/quickdraw.css'), 'text/css; charset=utf-8']
