@@ -161,9 +161,9 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
     exportLocal() {
       return store.getSnapshot()
     },
-    mergeLocal() {
+    mergeLocal(choices = {}) {
       if (!conflicted || !recovery || !socket || socket.readyState !== WebSocketImpl.OPEN) return { ok: false, reason: 'not-ready' }
-      const result = mergeSnapshots(recovery.base, store.getSnapshot(), recovery.snapshot)
+      const result = mergeSnapshots(recovery.base, store.getSnapshot(), recovery.snapshot, choices)
       if (result.conflicts.length) return { ok: false, reason: 'overlap', conflicts: result.conflicts }
       const diff = snapshotDiff(recovery.snapshot, result.snapshot)
       store.loadSnapshot(result.snapshot, 'remote')
