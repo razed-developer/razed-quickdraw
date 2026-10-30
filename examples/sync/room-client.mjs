@@ -1,3 +1,4 @@
+import { mergeSnapshots, snapshotDiff } from './room-merge.mjs'
 // Optional revision-aware client adapter for the room-server example.
 // No camera state or application roles are synchronized.
 // The server is authoritative; unsent edits are never silently replayed.
@@ -10,6 +11,8 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
   let pending = []
   let conflicted = false
   let hasSynced = false
+  let baseSnapshot = store.getSnapshot()
+  let recovery = null
   const clientId = Math.random().toString(36).slice(2) + Date.now().toString(36)
   let reconnectDelay = 250
   let retryTimer = null
@@ -56,11 +59,13 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
         if (pending.length || (hasSynced && localHasRecords && !remoteHasRecords)) {
           conflicted = true
           status('conflict')
-          onConflict({ snapshot: msg.snapshot, revision, pending: pending.slice() })
+          recovery = { snapshot: msg.snapshot, revision, base: baseSnapshot, local: local }
+          onConflict({ snapshot: msg.snapshot, revision, pending: pending.slice(), conflicts: mergeSnapshots(baseSnapshot, local, msg.snapshot).conflicts })
           return
         }
         store.loadSnapshot(msg.snapshot, 'remote')
         hasSynced = true
+        baseSnapshot = store.getSnapshot()
         status('connected')
         pump()
       } else if (msg.type === 'diff' && Number.isSafeInteger(msg.revision)) {
@@ -89,12 +94,14 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
           store.applyDiff(msg.diff, 'remote')
         }
         revision = msg.revision
+        if (!pending.length) baseSnapshot = store.getSnapshot()
         pump()
       } else if (msg.type === 'conflict') {
         conflicted = true
         awaiting = false
         status('conflict')
-        onConflict({ snapshot: msg.snapshot, revision: msg.revision, pending: pending.slice() })
+        recovery = { snapshot: msg.snapshot, revision: msg.revision, base: baseSnapshot, local: store.getSnapshot() }
+        onConflict({ snapshot: msg.snapshot, revision: msg.revision, pending: pending.slice(), conflicts: mergeSnapshots(baseSnapshot, recovery.local, msg.snapshot).conflicts })
       } else if (msg.type === 'error') {
         status('error')
       }
@@ -118,12 +125,33 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
       if (!conflicted || !Number.isSafeInteger(nextRevision)) return false
       store.loadSnapshot(snapshot, 'remote')
       hasSynced = true
+      baseSnapshot = store.getSnapshot()
+      recovery = null
       revision = nextRevision
       pending = []
       awaiting = false
       conflicted = false
       status('connected')
       return true
+    },
+    exportLocal() {
+      return store.getSnapshot()
+    },
+    mergeLocal() {
+      if (!conflicted || !recovery || !socket || socket.readyState !== WebSocketImpl.OPEN) return { ok: false, reason: 'not-ready' }
+      const result = mergeSnapshots(recovery.base, recovery.local, recovery.snapshot)
+      if (result.conflicts.length) return { ok: false, reason: 'overlap', conflicts: result.conflicts }
+      const diff = snapshotDiff(recovery.snapshot, result.snapshot)
+      store.loadSnapshot(result.snapshot, 'remote')
+      pending = Object.keys(diff.added).length || Object.keys(diff.updated).length || Object.keys(diff.removed).length ? [diff] : []
+      revision = recovery.revision
+      baseSnapshot = recovery.snapshot
+      recovery = null
+      conflicted = false
+      awaiting = false
+      status('connected')
+      pump()
+      return { ok: true }
     },
     disconnect() {
       stopped = true
