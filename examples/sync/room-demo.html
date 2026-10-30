@@ -91,6 +91,29 @@ function start() {
     document.getElementById(`board-${name}`).replaceChildren()
     const board = createQuickdraw({ container: document.getElementById(`board-${name}`), theme:'light', grid:'dots', watermark:false })
     boards.push(board)
+    const setFollow = enabled => {
+      follow[name] = enabled
+      document.getElementById(`follow-${name}`).textContent = `Follow ${name==='a'?'B':'A'}: ${enabled?'On':'Off'}`
+      if (enabled && cameras[name]) board.editor.followBounds(cameras[name])
+    }
+    // Only intentional board input exits follow. Passive pointer movement,
+    // hover, and remote camera updates must not cancel it.
+    const cancelFollow = () => { if (follow[name]) setFollow(false) }
+    const element = board.editor.container
+    const onPointerDown = () => cancelFollow()
+    const onWheel = () => cancelFollow()
+    const onKeyDown = event => {
+      if (['Shift','Control','Alt','Meta'].includes(event.key)) return
+      cancelFollow()
+    }
+    element.addEventListener('pointerdown', onPointerDown, true)
+    element.addEventListener('wheel', onWheel, {capture:true,passive:true})
+    element.addEventListener('keydown', onKeyDown, true)
+    cameraCleanups.push(()=>{
+      element.removeEventListener('pointerdown',onPointerDown,true)
+      element.removeEventListener('wheel',onWheel,true)
+      element.removeEventListener('keydown',onKeyDown,true)
+    })
     document.getElementById(`follow-${name}`).textContent=`Follow ${name==='a'?'B':'A'}: Off`
     const connection = connectRoom({
       participant:name.toUpperCase(),
@@ -99,7 +122,7 @@ function start() {
         const target=document.getElementById(`invite-${name}`)
         target.replaceChildren()
         const label=document.createElement('span');label.textContent=`Participant ${message.from} invites you to their view. `
-        const go=document.createElement('button');go.textContent='Go to view';go.onclick=()=>{board.editor.followBounds(message.bounds,{animate:300});target.replaceChildren()}
+        const go=document.createElement('button');go.textContent='Go to view';go.onclick=()=>{cameras[name]=message.bounds;setFollow(true);target.replaceChildren()}
         const dismiss=document.createElement('button');dismiss.textContent='Dismiss';dismiss.onclick=()=>target.replaceChildren()
         target.append(label,go,dismiss)
       },
@@ -117,9 +140,7 @@ function start() {
     connections.push(connection)
     const followButton=document.getElementById(`follow-${name}`)
     followButton.onclick=()=>{
-      follow[name]=!follow[name]
-      followButton.textContent=`Follow ${name==='a'?'B':'A'}: ${follow[name]?'On':'Off'}`
-      if(follow[name] && cameras[name]) board.editor.followBounds(cameras[name])
+      setFollow(!follow[name])
     }
     document.getElementById(`call-${name}`).onclick=()=>connection.callParticipant(board.editor.viewportPageBounds())
     let last=0
