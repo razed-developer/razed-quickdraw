@@ -20,6 +20,14 @@ describe('three-way offline recovery', () => {
     const result = mergeSnapshots(base,local,remote)
     assert.deepEqual(Object.keys(result.snapshot.document.store),['b'])
   })
+  it('requires explicit choice for overlapping edits', () => {
+    const base = snap({ a: shape('a') })
+    const local = snap({ a: shape('a', 2) })
+    const remote = snap({ a: shape('a', 3) })
+    assert.deepEqual(mergeSnapshots(base, local, remote).conflicts, ['a'])
+    assert.equal(mergeSnapshots(base, local, remote, {a:'local'}).snapshot.document.store.a.x, 2)
+    assert.equal(mergeSnapshots(base, local, remote, {a:'server'}).snapshot.document.store.a.x, 3)
+  })
   it('refuses overlapping changes and delete-versus-edit', () => {
     const base = snap({ a: shape('a') })
     assert.deepEqual(mergeSnapshots(base,snap({a:shape('a',2)}),snap({a:shape('a',3)})).conflicts,['a'])
