@@ -9,6 +9,7 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
   let stopped = false
   let pending = []
   let conflicted = false
+  const clientId = Math.random().toString(36).slice(2) + Date.now().toString(36)
   let reconnectDelay = 250
   let retryTimer = null
 
@@ -20,7 +21,7 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
   }
   function pump() {
     if (stopped || conflicted || awaiting || revision === null || !pending.length) return
-    if (send({ type: 'diff', baseRevision: revision, diff: pending[0] })) awaiting = true
+    if (send({ type: 'diff', baseRevision: revision, diff: pending[0], clientId })) awaiting = true
   }
   const unsubscribe = store.listen(diff => {
     if (stopped) return
@@ -66,18 +67,13 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
           send({ type: 'resync' })
           return
         }
-        // The relay broadcasts to the author too; its acknowledgement is
-        // identified by awaiting, not by diff equality. The single in-flight
-        // protocol requires an explicit sender identity to distinguish peers.
-        // Until then, receiving any diff while awaiting triggers safe resync.
-        if (awaiting) {
-          status('resyncing')
-          revision = null
+        if (msg.clientId === clientId) {
+          // Acknowledged local edit: it is already present in this store.
+          pending.shift()
           awaiting = false
-          send({ type: 'resync' })
-          return
+        } else {
+          store.applyDiff(msg.diff, 'remote')
         }
-        store.applyDiff(msg.diff, 'remote')
         revision = msg.revision
         pump()
       } else if (msg.type === 'conflict') {
