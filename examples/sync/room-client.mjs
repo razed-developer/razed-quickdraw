@@ -51,8 +51,8 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
         awaiting = false
         // Never replace locally edited content without an explicit decision.
         const local = store.getSnapshot()
-        const localHasRecords = Object.keys(local.records || local).length > 0
-        const remoteHasRecords = Object.keys(msg.snapshot?.records || msg.snapshot || {}).length > 0
+        const localHasRecords = Object.keys(local.document?.store || {}).length > 0
+        const remoteHasRecords = Object.keys(msg.snapshot?.document?.store || {}).length > 0
         if (pending.length || (hasSynced && localHasRecords && !remoteHasRecords)) {
           conflicted = true
           status('conflict')
