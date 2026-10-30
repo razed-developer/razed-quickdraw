@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "node relay.mjs",
-    "test": "node --test relay.test.mjs"
+    "test": "node --test relay.test.mjs",
+    "dev:rooms": "node room-server.mjs"
   },
   "dependencies": {
     "ws": "^8.18.0"
