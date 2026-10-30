@@ -76,7 +76,7 @@ export function createRoomSyncServer() {
         return
       }
       joined.revision++
-      const packet = { type: 'diff', revision: joined.revision, diff }
+      const packet = { type: 'diff', revision: joined.revision, diff, clientId: typeof msg.clientId === 'string' ? msg.clientId : null }
       for (const peer of joined.peers) send(peer, packet)
     })
     socket.on('close', () => {
