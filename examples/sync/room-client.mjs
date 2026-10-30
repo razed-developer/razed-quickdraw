@@ -13,6 +13,9 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
   let hasSynced = false
   let baseSnapshot = store.getSnapshot()
   let recovery = null
+  let frozenBase = null
+  let confirmedSnapshot = store.getSnapshot()
+  let confirmedRevision = null
   const clientId = Math.random().toString(36).slice(2) + Date.now().toString(36)
   let reconnectDelay = 250
   let retryTimer = null
@@ -29,6 +32,7 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
   }
   const unsubscribe = store.listen(diff => {
     if (stopped) return
+    if (revision === null && frozenBase === null && hasSynced) frozenBase = confirmedSnapshot
     pending.push(diff)
     pump()
   }, { source: 'user' })
@@ -59,13 +63,16 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
         if (pending.length || (hasSynced && localHasRecords && !remoteHasRecords)) {
           conflicted = true
           status('conflict')
-          recovery = { snapshot: msg.snapshot, revision, base: baseSnapshot, local: local }
-          onConflict({ snapshot: msg.snapshot, revision, pending: pending.slice(), conflicts: mergeSnapshots(baseSnapshot, local, msg.snapshot).conflicts })
+          recovery = { snapshot: msg.snapshot, revision, base: frozenBase || confirmedSnapshot, local: local }
+          onConflict({ snapshot: msg.snapshot, revision, pending: pending.slice(), conflicts: mergeSnapshots(recovery.base, local, msg.snapshot).conflicts })
           return
         }
         store.loadSnapshot(msg.snapshot, 'remote')
         hasSynced = true
         baseSnapshot = store.getSnapshot()
+        confirmedSnapshot = store.getSnapshot()
+        confirmedRevision = revision
+        frozenBase = null
         status('connected')
         pump()
       } else if (msg.type === 'diff' && Number.isSafeInteger(msg.revision)) {
@@ -94,13 +101,17 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
           store.applyDiff(msg.diff, 'remote')
         }
         revision = msg.revision
-        if (!pending.length) baseSnapshot = store.getSnapshot()
+        if (!pending.length) {
+          baseSnapshot = store.getSnapshot()
+          confirmedSnapshot = store.getSnapshot()
+          confirmedRevision = revision
+        }
         pump()
       } else if (msg.type === 'conflict') {
         conflicted = true
         awaiting = false
         status('conflict')
-        recovery = { snapshot: msg.snapshot, revision: msg.revision, base: baseSnapshot, local: store.getSnapshot() }
+        recovery = { snapshot: msg.snapshot, revision: msg.revision, base: frozenBase || confirmedSnapshot, local: store.getSnapshot() }
         onConflict({ snapshot: msg.snapshot, revision: msg.revision, pending: pending.slice(), conflicts: mergeSnapshots(baseSnapshot, recovery.local, msg.snapshot).conflicts })
       } else if (msg.type === 'error') {
         status('error')
@@ -109,6 +120,7 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
     current.addEventListener('close', () => {
       if (socket !== current || stopped) return
       socket = null
+      if (hasSynced && frozenBase === null) frozenBase = confirmedSnapshot
       revision = null
       awaiting = false
       status('disconnected')
@@ -126,6 +138,9 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
       store.loadSnapshot(snapshot, 'remote')
       hasSynced = true
       baseSnapshot = store.getSnapshot()
+      confirmedSnapshot = store.getSnapshot()
+      confirmedRevision = nextRevision
+      frozenBase = null
       recovery = null
       revision = nextRevision
       pending = []
@@ -146,6 +161,9 @@ export function connectRoom({ store, url, room, WebSocketImpl = globalThis.WebSo
       pending = Object.keys(diff.added).length || Object.keys(diff.updated).length || Object.keys(diff.removed).length ? [diff] : []
       revision = recovery.revision
       baseSnapshot = recovery.snapshot
+      confirmedSnapshot = recovery.snapshot
+      confirmedRevision = recovery.revision
+      frozenBase = null
       recovery = null
       conflicted = false
       awaiting = false
