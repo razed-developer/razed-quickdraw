@@ -2,14 +2,19 @@
 // Records are atomic: overlapping edits remain unresolved rather than guessing.
 const records = snapshot => snapshot?.document?.store || {}
 const equal = (a,b) => JSON.stringify(a) === JSON.stringify(b)
-export function mergeSnapshots(base, local, remote) {
+export function mergeSnapshots(base, local, remote, choices = {}) {
   const before = records(base), mine = records(local), theirs = records(remote)
   const merged = {}, conflicts = []
   for (const id of new Set([...Object.keys(before), ...Object.keys(mine), ...Object.keys(theirs)])) {
     const b = before[id], l = mine[id], r = theirs[id]
     const localChanged = !equal(l,b), remoteChanged = !equal(r,b)
     if (localChanged && remoteChanged && !equal(l,r)) {
-      conflicts.push(id)
+      if (choices[id] !== 'local' && choices[id] !== 'server') {
+        conflicts.push(id)
+        continue
+      }
+      const selected = choices[id] === 'local' ? l : r
+      if (selected !== undefined) merged[id] = selected
       continue
     }
     const chosen = localChanged ? l : r
