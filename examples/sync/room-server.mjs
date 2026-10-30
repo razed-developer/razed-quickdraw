@@ -92,6 +92,15 @@ export function createRoomSyncServer({ dataDir = resolve(dirname(fileURLToPath(i
         send(socket, { type: 'snapshot', revision: joined.revision, snapshot: joined.store.getSnapshot() })
         return
       }
+      if (msg.type === 'camera' || msg.type === 'call') {
+        const bounds = msg.bounds
+        if (!bounds || !['x','y','w','h'].every(k => typeof bounds[k] === 'number' && Number.isFinite(bounds[k])) || bounds.w <= 0 || bounds.h <= 0) {
+          send(socket, {type:'error',code:'invalid-bounds'}); return
+        }
+        const packet = {type:msg.type, from:typeof msg.from === 'string' ? msg.from.slice(0,64) : '', bounds}
+        for (const peer of joined.peers) if (peer !== socket) send(peer,packet)
+        return
+      }
       if (msg.type !== 'diff') { send(socket, { type: 'error', code: 'unknown-type' }); return }
       if (!Number.isSafeInteger(msg.baseRevision) || msg.baseRevision !== joined.revision) {
         send(socket, { type: 'conflict', revision: joined.revision, snapshot: joined.store.getSnapshot() })
