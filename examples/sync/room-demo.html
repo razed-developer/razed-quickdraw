@@ -116,13 +116,7 @@ function start() {
       const label=name==='a'?'B':'A'
       const center={x:rect.x+rect.w/2,y:rect.y+rect.h/2}
       const visible=rect.x<w && rect.x+rect.w>0 && rect.y<h && rect.y+rect.h>0
-      if(visible){
-        const outline=document.createElement('div')
-        outline.className='presence-outline'
-        Object.assign(outline.style,{left:rect.x+'px',top:rect.y+'px',width:rect.w+'px',height:rect.h+'px'})
-        const tag=document.createElement('span');tag.textContent='Participant '+label
-        outline.append(tag);layer.append(outline)
-      } else {
+      if(!visible){
         const dx=center.x-w/2,dy=center.y-h/2
         const margin=32
         const scale=Math.min((w/2-margin)/Math.max(Math.abs(dx),1),(h/2-margin)/Math.max(Math.abs(dy),1))
