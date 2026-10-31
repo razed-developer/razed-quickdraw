@@ -244,7 +244,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
   function buildColors(p) {
     p.classList.add('qd-style-pop')
     const cur = editor.currentStyles()
-    const row = (cls) => { const r = el('div', 'qd-row ' + cls); p.appendChild(r); return r }
+    const row = (cls) => el('div', 'qd-row ' + cls)
 
     const paletteLayout=el('div','qd-palette-layout')
     const paletteLeft=el('div','qd-palette-left')
@@ -364,7 +364,10 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     const savedRow=row('qd-colors')
     paletteLeft.append(savedRow)
     const savedActions=row('qd-palette-actions')
-    paletteLeft.append(savedActions)
+    const savedHeading=paletteLeft.querySelector('.qd-palette-heading')
+    const savedHeader=el('div','qd-palette-saved-header')
+    savedHeading.replaceWith(savedHeader)
+    savedHeader.append(savedHeading,savedActions)
     savedActions.append(
       icon('save','Save selected colour',()=>saveColor(state.saved,selectedHex())),
       icon('copy','Create collection from saved colours',()=>createCollection(true)),
@@ -398,7 +401,9 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     }
     const collectionsHeader=heading('COLLECTIONS',paletteRight)
     const collectionActions=row('qd-palette-actions')
-    paletteRight.append(collectionActions)
+    const collectionsHead=el('div','qd-palette-saved-header')
+    collectionsHeader.replaceWith(collectionsHead)
+    collectionsHead.append(collectionsHeader,collectionActions)
     const columns=el('div','qd-palette-collections')
     paletteRight.append(columns)
     collectionActions.append(icon('copy','New empty collection',()=>createCollection()),icon('settings','Collection gallery',()=>{gallery.hidden=!gallery.hidden}))
