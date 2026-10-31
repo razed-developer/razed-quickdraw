@@ -246,7 +246,13 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     const cur = editor.currentStyles()
     const row = (cls) => { const r = el('div', 'qd-row ' + cls); p.appendChild(r); return r }
 
+    const paletteLayout=el('div','qd-palette-layout')
+    const paletteLeft=el('div','qd-palette-left')
+    const paletteRight=el('div','qd-palette-right')
+    paletteLayout.append(paletteLeft,paletteRight)
+    p.append(paletteLayout)
     const colors = row('qd-colors')
+    paletteLeft.append(colors)
     for (const c of COLOR_IDS) {
       const b = el('button', 'qd-dot' + (cur.color === c ? ' on' : ''))
       b.style.setProperty('--dot', theme().colors[c].stroke)
@@ -275,6 +281,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     picker.addEventListener('input',e=>{e.stopPropagation();applyColor(picker.value)})
     hex.addEventListener('change',e=>{e.stopPropagation();applyColor(hex.value)})
     customRow.append(picker,hex)
+    paletteLeft.append(customRow)
     if (typeof window.EyeDropper === 'function') {
       const eyedrop = el('button','qd-opt')
       eyedrop.textContent = 'Pick from screen'
@@ -350,12 +357,14 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       element.addEventListener('dragover',e=>{if(e.dataTransfer.types.includes('text/plain'))e.preventDefault()})
       element.addEventListener('drop',e=>{e.preventDefault();const value=e.dataTransfer.getData('text/plain');if(valid(value))fn(value)})
     }
-    const heading=(label)=>{
-      const h=el('div','qd-palette-heading');h.textContent=label;p.append(h);return h
+    const heading=(label,parent=paletteLeft)=>{
+      const h=el('div','qd-palette-heading');h.textContent=label;parent.append(h);return h
     }
     heading('SAVED')
     const savedRow=row('qd-colors')
+    paletteLeft.append(savedRow)
     const savedActions=row('qd-palette-actions')
+    paletteLeft.append(savedActions)
     savedActions.append(
       icon('save','Save selected colour',()=>saveColor(state.saved,selectedHex())),
       icon('copy','Create collection from saved colours',()=>createCollection(true)),
@@ -387,12 +396,13 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
         name:'Collection #'+number,colors:copySaved?[...state.saved]:[]})
       persist();render()
     }
-    const columns=el('div','qd-palette-collections')
-    p.append(columns)
-    const collectionsHeader=heading('COLLECTIONS')
+    const collectionsHeader=heading('COLLECTIONS',paletteRight)
     const collectionActions=row('qd-palette-actions')
+    paletteRight.append(collectionActions)
+    const columns=el('div','qd-palette-collections')
+    paletteRight.append(columns)
     collectionActions.append(icon('copy','New empty collection',()=>createCollection()),icon('settings','Collection gallery',()=>{gallery.hidden=!gallery.hidden}))
-    const gallery=el('div','qd-palette-gallery');gallery.hidden=true;p.append(gallery)
+    const gallery=el('div','qd-palette-gallery');gallery.hidden=true;paletteRight.append(gallery)
     function render(){
       savedRow.replaceChildren()
       for(const value of state.saved)swatch(value,savedRow,v=>{
