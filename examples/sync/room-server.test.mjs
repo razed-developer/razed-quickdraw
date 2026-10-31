@@ -1,19 +1,27 @@
 import assert from 'node:assert/strict'
 import { afterEach, describe, it } from 'node:test'
 import WebSocket from 'ws'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Store } from '../../packages/core/src/store.js'
 import { createRoomSyncServer } from './room-server.mjs'
 
 const servers = new Set()
 const sockets = new Set()
+const directories = new Set()
 afterEach(async () => {
   for (const socket of sockets) socket.terminate()
   sockets.clear()
   await Promise.all([...servers].map(server => server.close()))
   servers.clear()
+  for (const dir of directories) rmSync(dir, { recursive: true, force: true })
+  directories.clear()
 })
 async function setup() {
-  const server = createRoomSyncServer()
+  const dataDir = mkdtempSync(join(tmpdir(), 'quickdraw-relay-test-'))
+  directories.add(dataDir)
+  const server = createRoomSyncServer({ dataDir })
   servers.add(server)
   const { port } = await server.listen()
   return `ws://127.0.0.1:${port}`
