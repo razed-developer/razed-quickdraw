@@ -284,8 +284,10 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     paletteLeft.append(customRow)
     if (typeof window.EyeDropper === 'function') {
       const eyedrop = el('button','qd-opt')
-      eyedrop.textContent = 'Pick from screen'
-      eyedrop.title = 'Sample a colour from the screen'
+      eyedrop.innerHTML = SVG('<path d="m2 22 6-6m4-4 7-7a2.12 2.12 0 0 0-3-3l-7 7m3 3-3-3m3 3-4 4m0 0 4 4m-4-4-4 4"/>')
+      eyedrop.classList.add('qd-eyedropper')
+      eyedrop.title = 'Pick colour from screen'
+      eyedrop.setAttribute('aria-label','Pick colour from screen')
       eyedrop.addEventListener('click',async e=>{
         e.stopPropagation()
         try { const result=await new window.EyeDropper().open(); applyColor(result.sRGBHex) }
