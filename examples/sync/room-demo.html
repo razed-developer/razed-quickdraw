@@ -102,6 +102,7 @@ function start() {
     try { savedColour = localStorage.getItem(colourKey) } catch { /* storage unavailable */ }
     const validColour = savedColour && (/^#[0-9a-f]{6}$/i.test(savedColour) ||
       ['black','grey','light-violet','violet','blue','light-blue','yellow','orange','green','light-green','light-red','red'].includes(savedColour))
+    document.getElementById(`board-${name}`).dataset.qdSwatchOwner = name
     const board = createQuickdraw({ container: document.getElementById(`board-${name}`), theme:'light', grid:'dots', watermark:false,
       ...(validColour ? { styles: { color: savedColour } } : {}) })
     const saveColour = () => {
