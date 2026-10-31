@@ -96,7 +96,18 @@ function start() {
   if(!/^[a-zA-Z0-9_-]{1,64}$/.test(room)) { alert('Use 1–64 letters, digits, _ or -'); return }
   for(const name of ['a','b']) {
     document.getElementById(`board-${name}`).replaceChildren()
-    const board = createQuickdraw({ container: document.getElementById(`board-${name}`), theme:'light', grid:'dots', watermark:false })
+    // Editor colour is a personal preference, not shared room document data.
+    const colourKey = 'quickdraw:demo:active-colour:' + name
+    let savedColour = null
+    try { savedColour = localStorage.getItem(colourKey) } catch { /* storage unavailable */ }
+    const validColour = savedColour && (/^#[0-9a-f]{6}$/i.test(savedColour) ||
+      ['black','grey','light-violet','violet','blue','light-blue','yellow','orange','green','light-green','light-red','red'].includes(savedColour))
+    const board = createQuickdraw({ container: document.getElementById(`board-${name}`), theme:'light', grid:'dots', watermark:false,
+      ...(validColour ? { styles: { color: savedColour } } : {}) })
+    const saveColour = () => {
+      try { localStorage.setItem(colourKey, board.editor.styles.color) } catch { /* private mode */ }
+    }
+    cameraCleanups.push(board.editor.on('styles', saveColour))
     boards.push(board)
     const layer=document.createElement('div')
     layer.className='presence-layer'
