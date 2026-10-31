@@ -115,3 +115,13 @@ export const GEO_IDS = ['rectangle', 'ellipse', 'triangle', 'diamond', 'hexagon'
 // Highlighter: wide translucent band that multiplies into the paper.
 export const HIGHLIGHT_ALPHA = 0.55
 export const HIGHLIGHT_SCALE = 4.5 // band width = SIZES[size] * this
+
+export function resolveShapeColor(theme, value = 'black') {
+  if (typeof value === 'string' && /^#[0-9a-fA-F]{6}$/.test(value)) {
+    const hex = value.toLowerCase()
+    const rgb = [1,3,5].map(i=>parseInt(hex.slice(i,i+2),16))
+    const mix = (target,amount) => '#' + rgb.map(v=>Math.round(v*(1-amount)+target*amount).toString(16).padStart(2,'0')).join('')
+    return {stroke:hex,fill:mix(theme.id==='dark'?20:255,0.82),note:mix(255,0.72)}
+  }
+  return theme.colors[value] || theme.colors.black
+}
