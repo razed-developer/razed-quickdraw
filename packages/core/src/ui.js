@@ -336,6 +336,34 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       value=value.toLowerCase()
       if(valid(value)&&!target.includes(value)&&target.length<48){target.push(value);persist();render()}
     }
+    const editSwatch=(target,value,container)=>{
+      container.querySelector('.qd-palette-swatch-editor')?.remove()
+      const editorRow=el('div','qd-palette-swatch-editor')
+      const input=document.createElement('input')
+      input.type='color';input.value=value
+      input.title='Choose replacement colour'
+      const preview=el('span','qd-palette-swatch-value')
+      preview.textContent=value.toUpperCase()
+      input.addEventListener('input',()=>{preview.textContent=input.value.toUpperCase()})
+      const done=icon('save','Save changed colour',()=>{
+        const replacement=input.value.toLowerCase()
+        const index=target.indexOf(value)
+        if(index>=0){
+          if(!target.includes(replacement)||replacement===value)target[index]=replacement
+          else target.splice(index,1)
+          persist();render()
+        }
+      })
+      const remove=icon('trash-2','Delete this colour',()=>{
+        const index=target.indexOf(value)
+        if(index>=0){target.splice(index,1);persist();render()}
+      })
+      const cancel=icon('x','Cancel editing',()=>editorRow.remove())
+      cancel.textContent='×'
+      editorRow.append(input,preview,done,remove,cancel)
+      container.append(editorRow)
+      input.focus()
+    }
     const swatch=(value,container,onEdit)=>{
       const b=el('button','qd-dot'+(selectedHex()===value?' on':''))
       b.style.setProperty('--dot',value)
@@ -410,13 +438,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     const gallery=el('div','qd-palette-gallery');gallery.hidden=true;paletteRight.append(gallery)
     function render(){
       savedRow.replaceChildren()
-      for(const value of state.saved)swatch(value,savedRow,v=>{
-        const choice=prompt('Edit saved colour (HEX), or leave blank to delete',v)
-        if(choice===null)return
-        if(choice==='')state.saved=state.saved.filter(x=>x!==v)
-        else if(valid(choice))state.saved=clean(state.saved.map(x=>x===v?choice:x))
-        persist();render()
-      })
+      for(const value of state.saved)swatch(value,savedRow,v=>editSwatch(state.saved,v,paletteLeft))
       columns.replaceChildren();gallery.replaceChildren()
       for(const [index,collection] of state.collections.entries()){
         const section=el('div','qd-palette-collection')
@@ -451,13 +473,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
         head.append(icon('share-2','Export this collection',()=>downloadJSON({format:'quickdraw-swatches-v1',name:collection.name,colors:collection.colors},'quickdraw-'+collection.id+'.json')))
         section.append(head)
         const dots=el('div','qd-colors')
-        for(const value of collection.colors)swatch(value,dots,v=>{
-          const choice=prompt('Edit colour (HEX), or leave blank to delete',v)
-          if(choice===null)return
-          if(choice==='')collection.colors=collection.colors.filter(x=>x!==v)
-          else if(valid(choice))collection.colors=clean(collection.colors.map(x=>x===v?choice:x))
-          persist();render()
-        })
+        for(const value of collection.colors)swatch(value,dots,v=>editSwatch(collection.colors,v,section))
         acceptDrop(dots,value=>saveColor(collection.colors,value))
         section.append(dots);columns.append(section)
         const manage=el('div','qd-palette-gallery-row')
