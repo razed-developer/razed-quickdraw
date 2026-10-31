@@ -191,13 +191,16 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
   const toolsBtn = makeBtn('tools', (e, b) => openPopover('tools', (p) => buildGrid(p, [...DOCK_NAMES]), b))
   dock.appendChild(toolsBtn)
 
-  // styles button: a ring of the current color
-  const styleBtn = makeBtn('styles', (e, b) => openPopover('styles', buildStyles, b))
+  // Colour and drawing-style controls have separate popovers.
+  const styleBtn = makeBtn('styles', (e, b) => openPopover('colors', buildColors, b))
   styleBtn.classList.add('qd-style-btn')
-  styleBtn.title = 'Color & style'
+  styleBtn.title = 'Colour & swatches'
   const styleDot = el('span', 'qd-style-dot')
   styleBtn.appendChild(styleDot)
   dock.appendChild(styleBtn)
+  const drawingStyleBtn = makeBtn('styles', (e, b) => openPopover('drawing-style', buildDrawingStyles, b))
+  drawingStyleBtn.title = 'Line & fill style'
+  dock.appendChild(drawingStyleBtn)
 
   const moreBtn = makeBtn('more', (e, b) => openPopover('more', (p) => buildGrid(p, hiddenNames), b))
   dock.appendChild(moreBtn)
@@ -237,7 +240,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
 
   // ---- styles popover ------------------------------------------------------
   const theme = () => THEMES[editor.theme.id]
-  function buildStyles(p) {
+  function buildColors(p) {
     p.classList.add('qd-style-pop')
     const cur = editor.currentStyles()
     const row = (cls) => { const r = el('div', 'qd-row ' + cls); p.appendChild(r); return r }
@@ -282,6 +285,58 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       })
       customRow.append(eyedrop)
     }
+    const swatchKey = 'quickdraw:personal-swatches:v1'
+    const readSwatches = () => {
+      try {
+        const saved = JSON.parse(localStorage.getItem(swatchKey) || '[]')
+        return Array.isArray(saved) ? [...new Set(saved.filter(v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)).map(v => v.toLowerCase()))].slice(0,48) : []
+      } catch { return [] }
+    }
+    const savedRow = row('qd-colors')
+    const swatches = readSwatches()
+    const renderSaved = () => {
+      savedRow.replaceChildren()
+      for (const value of swatches) {
+        const b = el('button','qd-dot' + (editor.currentStyles().color === value ? ' on' : ''))
+        b.style.setProperty('--dot',value)
+        b.title = value + ' (right-click to remove)'
+        b.addEventListener('click',e=>{e.stopPropagation();editor.setStyle('color',value);restyle()})
+        b.addEventListener('contextmenu',e=>{
+          e.preventDefault();e.stopPropagation()
+          swatches.splice(swatches.indexOf(value),1)
+          try {localStorage.setItem(swatchKey,JSON.stringify(swatches))}catch{}
+          renderSaved()
+        })
+        savedRow.append(b)
+      }
+    }
+    const saveSwatch = el('button','qd-opt')
+    saveSwatch.textContent = 'Save current colour'
+    saveSwatch.title = 'Save this colour to personal swatches'
+    saveSwatch.addEventListener('click',e=>{
+      e.stopPropagation()
+      const value = editor.currentStyles().color
+      const hex = resolveShapeColor(theme(),value || 'blue').stroke.toLowerCase()
+      if (!swatches.includes(hex) && swatches.length < 48) {
+        swatches.push(hex)
+        try {localStorage.setItem(swatchKey,JSON.stringify(swatches))}catch{}
+      }
+      renderSaved()
+    })
+    p.append(saveSwatch)
+    renderSaved()
+    function restyle() {
+      const color = editor.currentStyles().color
+      colors.querySelectorAll('.qd-dot').forEach((b,i)=>b.classList.toggle('on',COLOR_IDS[i] === color))
+      renderSaved()
+      refresh()
+    }
+  }
+
+  function buildDrawingStyles(p) {
+    p.classList.add('qd-style-pop')
+    const cur = editor.currentStyles()
+    const row = cls => { const r = el('div', 'qd-row ' + cls); p.appendChild(r); return r }
     const sizes = row('qd-sizes')
     SIZE_IDS.forEach((s, i) => {
       const b = el('button', 'qd-opt' + (cur.size === s ? ' on' : ''))
@@ -306,14 +361,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       b.addEventListener('click', (e) => { e.stopPropagation(); editor.setStyle('fill', f); restyle() })
       fills.appendChild(b)
     }
-    function restyle() {
-      const c2 = editor.currentStyles()
-      colors.querySelectorAll('.qd-dot').forEach((b, i) => b.classList.toggle('on', COLOR_IDS[i] === c2.color))
-      sizes.querySelectorAll('.qd-opt').forEach((b, i) => b.classList.toggle('on', SIZE_IDS[i] === c2.size))
-      dashes.querySelectorAll('.qd-opt').forEach((b, i) => b.classList.toggle('on', DASH_IDS[i] === c2.dash))
-      fills.querySelectorAll('.qd-opt').forEach((b, i) => b.classList.toggle('on', FILL_IDS[i] === c2.fill))
-      refresh()
-    }
+    function restyle() { refresh() }
   }
 
   // ---- menu ----------------------------------------------------------------
