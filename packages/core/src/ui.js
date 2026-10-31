@@ -362,7 +362,21 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       b.addEventListener('click', (e) => { e.stopPropagation(); editor.setStyle('fill', f); restyle() })
       fills.appendChild(b)
     }
-    function restyle() { refresh() }
+    function restyle() {
+      const current = editor.currentStyles()
+      for (const [container, values, key] of [
+        [sizes, SIZE_IDS, 'size'],
+        [dashes, DASH_IDS, 'dash'],
+        [fills, FILL_IDS, 'fill'],
+      ]) {
+        container.querySelectorAll('.qd-opt').forEach((button, index) => {
+          const selected = values[index] === current[key]
+          button.classList.toggle('on', selected)
+          button.setAttribute('aria-pressed', String(selected))
+        })
+      }
+      refresh()
+    }
   }
 
   // ---- menu ----------------------------------------------------------------
