@@ -315,7 +315,17 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     const selectedHex=()=>resolveShapeColor(theme(),editor.currentStyles().color||'blue').stroke.toLowerCase()
     const icon=(name,title,fn)=>{
       const b=el('button','qd-opt qd-palette-action')
-      b.innerHTML=ICONS[name]||name
+      const extras={
+        save:SVG('<path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z"/><path d="M17 21v-8H7v8M7 3v5h8"/>'),
+        upload:SVG('<path d="M12 16V3m-5 5 5-5 5 5M4 16v4h16v-4"/>'),
+        'share-2':SVG('<circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><path d="m8.7 10.7 6.6-4.4m-6.6 7 6.6 4.4"/>'),
+        settings:SVG('<path d="M4 5h16M4 12h16M4 19h16"/><circle cx="9" cy="5" r="2"/><circle cx="15" cy="12" r="2"/>'),
+        'arrow-up':SVG('<path d="m6 14 6-6 6 6"/>'),
+        'arrow-down':SVG('<path d="m6 10 6 6 6-6"/>'),
+        pencil:ICONS.draw,
+        'trash-2':ICONS.trash
+      }
+      b.innerHTML=ICONS[name]||extras[name]||name
       b.title=title;b.setAttribute('aria-label',title)
       b.addEventListener('click',e=>{e.stopPropagation();fn()})
       return b
@@ -337,7 +347,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       return b
     }
     const acceptDrop=(element,fn)=>{
-      element.addEventListener('dragover',e=>{if(valid(e.dataTransfer.types.includes('text/plain')?'#000000':'')||e.dataTransfer.types.includes('text/plain'))e.preventDefault()})
+      element.addEventListener('dragover',e=>{if(e.dataTransfer.types.includes('text/plain'))e.preventDefault()})
       element.addEventListener('drop',e=>{e.preventDefault();const value=e.dataTransfer.getData('text/plain');if(valid(value))fn(value)})
     }
     const heading=(label)=>{
