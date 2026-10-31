@@ -130,6 +130,10 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
   const run = (name, b) => {
     if (name === 'image') { closePopover(); return editor.pickImage() }
     if (name === 'geo') return geoTap(b)
+    if (name === 'draw' || name === 'highlight' || name === 'line' || name === 'arrow') {
+      editor.setTool(name)
+      return openPopover('drawing-style', buildDrawingStyles, b)
+    }
     closePopover()
     editor.setTool(name)
   }
@@ -198,9 +202,6 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
   const styleDot = el('span', 'qd-style-dot')
   styleBtn.appendChild(styleDot)
   dock.appendChild(styleBtn)
-  const drawingStyleBtn = makeBtn('styles', (e, b) => openPopover('drawing-style', buildDrawingStyles, b))
-  drawingStyleBtn.title = 'Line & fill style'
-  dock.appendChild(drawingStyleBtn)
 
   const moreBtn = makeBtn('more', (e, b) => openPopover('more', (p) => buildGrid(p, hiddenNames), b))
   dock.appendChild(moreBtn)
@@ -285,7 +286,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       })
       customRow.append(eyedrop)
     }
-    const swatchKey = 'quickdraw:personal-swatches:v1'
+    const swatchKey = 'quickdraw:personal-swatches:v2:' + (editor.container.dataset.qdSwatchOwner || 'default')
     const readSwatches = () => {
       try {
         const saved = JSON.parse(localStorage.getItem(swatchKey) || '[]')
