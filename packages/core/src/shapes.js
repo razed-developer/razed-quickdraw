@@ -1,3 +1,4 @@
+import { resolveShapeColor } from './palette.js'
 // Shape definitions: bounds, canvas rendering and hit-testing for every
 // board shape type. Records are immutable, so per-shape caches (freehand
 // outlines, wobbled geo paths, text layout) key off the props object in
@@ -295,8 +296,8 @@ function hatchPattern(ctx, colorHex, themeId) {
 function fillPath(ctx, path, p, theme) {
   if (!p.fill || p.fill === 'none') return
   if (p.fill === 'semi') ctx.fillStyle = SEMI[theme.id]
-  else if (p.fill === 'pattern') ctx.fillStyle = hatchPattern(ctx, theme.colors[p.color].stroke, theme.id)
-  else ctx.fillStyle = theme.colors[p.color].fill
+  else if (p.fill === 'pattern') ctx.fillStyle = hatchPattern(ctx, resolveShapeColor(theme,p.color).stroke, theme.id)
+  else ctx.fillStyle = resolveShapeColor(theme,p.color).fill
   ctx.fill(path)
 }
 
@@ -335,7 +336,7 @@ function drawPath(shape) {
 export function drawShape(ctx, shape, opts) {
   const { theme } = opts
   const p = shape.props
-  const col = theme.colors[p.color || 'black']
+  const col = resolveShapeColor(theme,p.color || 'black')
   ctx.save()
   if (opts.ghost) ctx.globalAlpha = 0.3
   const lb = localBounds(shape)
