@@ -6,7 +6,7 @@
 // the standard set users already know.
 // Dependency-free ESM (see palette.js).
 
-import { COLOR_IDS, SIZE_IDS, DASH_IDS, FILL_IDS, GEO_IDS, GRID_IDS, THEMES } from './palette.js'
+import { resolveShapeColor, COLOR_IDS, SIZE_IDS, DASH_IDS, FILL_IDS, GEO_IDS, GRID_IDS, THEMES } from './palette.js'
 
 const SVG = (inner) =>
   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${inner}</svg>`
@@ -249,6 +249,38 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       b.title = c
       b.addEventListener('click', (e) => { e.stopPropagation(); editor.setStyle('color', c); restyle() })
       colors.appendChild(b)
+    }
+    const customRow = row('qd-custom-color')
+    const picker = document.createElement('input')
+    picker.type = 'color'
+    picker.title = 'Choose any colour'
+    picker.value = /^#[0-9a-f]{6}$/i.test(cur.color || '') ? cur.color : resolveShapeColor(theme(),cur.color || 'blue').stroke
+    const hex = document.createElement('input')
+    hex.type = 'text'
+    hex.maxLength = 7
+    hex.size = 8
+    hex.setAttribute('aria-label','Hex colour')
+    hex.value = picker.value
+    const applyColor = value => {
+      if (!/^#[0-9a-f]{6}$/i.test(value)) return
+      picker.value = value
+      hex.value = value.toLowerCase()
+      editor.setStyle('color',hex.value)
+      restyle()
+    }
+    picker.addEventListener('input',e=>{e.stopPropagation();applyColor(picker.value)})
+    hex.addEventListener('change',e=>{e.stopPropagation();applyColor(hex.value)})
+    customRow.append(picker,hex)
+    if (typeof window.EyeDropper === 'function') {
+      const eyedrop = el('button','qd-opt')
+      eyedrop.textContent = 'Pick from screen'
+      eyedrop.title = 'Sample a colour from the screen'
+      eyedrop.addEventListener('click',async e=>{
+        e.stopPropagation()
+        try { const result=await new window.EyeDropper().open(); applyColor(result.sRGBHex) }
+        catch { /* user cancelled or browser denied permission */ }
+      })
+      customRow.append(eyedrop)
     }
     const sizes = row('qd-sizes')
     SIZE_IDS.forEach((s, i) => {
@@ -551,7 +583,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     // the folded button wears the active tool so the state stays visible
     toolsBtn.innerHTML = ICONS[editor.tool === 'geo' ? editor.geoKind : editor.tool] || ICONS.select
     toolsBtn.classList.toggle('on', popover?.name === 'tools')
-    styleDot.style.background = editor.theme.colors[editor.currentStyles().color || 'blue'].stroke
+    styleDot.style.background = resolveShapeColor(editor.theme,editor.currentStyles().color || 'blue').stroke
     menuBtn.classList.toggle('on', popover?.name === 'menu')
     styleBtn.classList.toggle('on', popover?.name === 'styles')
     moreBtn.classList.toggle('on', popover?.name === 'more')
