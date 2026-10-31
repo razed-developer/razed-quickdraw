@@ -265,22 +265,14 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     picker.type = 'color'
     picker.title = 'Choose any colour'
     picker.value = /^#[0-9a-f]{6}$/i.test(cur.color || '') ? cur.color : resolveShapeColor(theme(),cur.color || 'blue').stroke
-    const hex = document.createElement('input')
-    hex.type = 'text'
-    hex.maxLength = 7
-    hex.size = 8
-    hex.setAttribute('aria-label','Hex colour')
-    hex.value = picker.value
     const applyColor = value => {
       if (!/^#[0-9a-f]{6}$/i.test(value)) return
       picker.value = value
-      hex.value = value.toLowerCase()
-      editor.setStyle('color',hex.value)
+      editor.setStyle('color',value.toLowerCase())
       restyle()
     }
     picker.addEventListener('input',e=>{e.stopPropagation();applyColor(picker.value)})
-    hex.addEventListener('change',e=>{e.stopPropagation();applyColor(hex.value)})
-    customRow.append(picker,hex)
+    customRow.append(picker)
     paletteLeft.append(customRow)
     if (typeof window.EyeDropper === 'function') {
       const eyedrop = el('button','qd-opt')
@@ -332,6 +324,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
         'arrow-up':SVG('<path d="m6 14 6-6 6 6"/>'),
         'arrow-down':SVG('<path d="m6 10 6 6 6-6"/>'),
         pencil:ICONS.draw,
+        'clear-all':SVG('<path d="M4 7h16M10 7V4h4v3M6 7l1 13h10l1-13M10 11v6m4-6v6"/>'),
         'trash-2':ICONS.trash
       }
       b.innerHTML=ICONS[name]||extras[name]||name
@@ -374,7 +367,12 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       icon('save','Save selected colour',()=>saveColor(state.saved,selectedHex())),
       icon('copy','Create collection from saved colours',()=>createCollection(true)),
       icon('download','Import JSON file',()=>importFile.click()),
-      icon('upload','Export saved colours as JSON file',()=>downloadJSON({format:'quickdraw-swatches-v1',name:'Saved colours',colors:state.saved},'quickdraw-saved.json'))
+      icon('upload','Export saved colours as JSON file',()=>downloadJSON({format:'quickdraw-swatches-v1',name:'Saved colours',colors:state.saved},'quickdraw-saved.json')),
+      icon('clear-all','Clear all saved colours',()=>{
+        if(state.saved.length && confirm('Clear all saved colours? Collections will not be changed.')){
+          state.saved=[];persist();render()
+        }
+      })
     )
     const importFile=document.createElement('input')
     importFile.type='file';importFile.accept='.json,application/json';importFile.hidden=true;p.append(importFile)
@@ -426,10 +424,29 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
         const name=el('button','qd-palette-name')
         name.textContent=collection.name
         name.title='Double-click to rename'
-        name.addEventListener('dblclick',()=>{
-          const next=prompt('Collection name',collection.name)
-          if(next?.trim()){collection.name=next.trim().slice(0,40);persist();render()}
-        })
+        const editName=()=>{
+          const input=document.createElement('input')
+          input.type='text';input.className='qd-palette-inline-name'
+          input.maxLength=40;input.value=collection.name
+          name.replaceWith(input);input.focus();input.select()
+          let finished=false
+          const finish=save=>{
+            if(finished)return
+            finished=true
+            if(save && input.value.trim()){
+              collection.name=input.value.trim().slice(0,40)
+              persist()
+            }
+            render()
+          }
+          input.addEventListener('keydown',e=>{
+            e.stopPropagation()
+            if(e.key==='Enter')finish(true)
+            if(e.key==='Escape')finish(false)
+          })
+          input.addEventListener('blur',()=>finish(true))
+        }
+        name.addEventListener('dblclick',editName)
         head.append(name)
         head.append(icon('share-2','Export this collection',()=>downloadJSON({format:'quickdraw-swatches-v1',name:collection.name,colors:collection.colors},'quickdraw-'+collection.id+'.json')))
         section.append(head)
@@ -448,8 +465,8 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
         manage.append(icon('arrow-up','Move collection up',()=>moveCollection(index,-1)))
         manage.append(icon('arrow-down','Move collection down',()=>moveCollection(index,1)))
         manage.append(icon('pencil','Rename collection',()=>{
-          const next=prompt('Collection name',collection.name)
-          if(next?.trim()){collection.name=next.trim().slice(0,40);persist();render()}
+          gallery.hidden=true
+          editName()
         }))
         manage.append(icon('trash-2','Delete collection',()=>{
           if(confirm('Delete '+collection.name+'?')){state.collections.splice(index,1);persist();render()}
