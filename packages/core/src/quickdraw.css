@@ -531,3 +531,8 @@
 .qd-palette-collection-head .qd-palette-inline-name { flex: 1; }
 .qd-palette-saved-header .qd-palette-actions { flex-wrap: nowrap; }
 .qd-palette-saved-header .qd-palette-action { flex-basis: 21px; width: 21px; min-width: 21px; padding: 2px; }
+
+.qd-palette-swatch-editor { display:flex; align-items:center; gap:4px; padding:5px 2px; margin-top:4px; border-top:1px solid var(--qd-divider); }
+.qd-palette-swatch-editor input[type="color"] { flex:0 0 36px; width:36px; height:27px; padding:1px; cursor:pointer; }
+.qd-palette-swatch-value { font-size:10px; flex:1; min-width:0; }
+.qd-palette-swatch-editor .qd-palette-action { flex:0 0 24px; min-width:24px; width:24px; padding:3px; }
