@@ -485,3 +485,19 @@
 .qd-palette-gallery-row > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
 .qd-palette-gallery-row .qd-palette-action { flex: 0 0 24px; }
 .qd-style-pop:has(.qd-palette-collections) { width: min(290px, calc(100% - 16px)); max-height: min(80vh, 540px); overflow-y: auto; }
+
+/* Reference-sketch layout: palette + permanent tray left, collections right. */
+.qd-style-pop:has(.qd-palette-layout) { width: min(390px, calc(100% - 16px)); max-height: min(80vh, 520px); overflow-y: auto; }
+.qd-palette-layout { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 9px; }
+.qd-palette-left, .qd-palette-right { min-width: 0; }
+.qd-palette-left { padding-right: 8px; border-right: 1px solid var(--qd-divider); }
+.qd-palette-layout .qd-colors { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+.qd-palette-layout .qd-custom-color { flex-wrap: wrap; }
+.qd-palette-layout .qd-custom-color input[type="text"] { min-width: 0; max-width: 85px; }
+.qd-palette-layout .qd-palette-collections { max-height: 280px; }
+.qd-palette-layout .qd-palette-heading { margin-top: 4px; }
+@container (max-width: 330px) {
+  .qd-style-pop:has(.qd-palette-layout) { width: calc(100% - 16px); }
+  .qd-palette-layout { grid-template-columns: minmax(0, 1fr); }
+  .qd-palette-left { padding-right: 0; padding-bottom: 8px; border-right: 0; border-bottom: 1px solid var(--qd-divider); }
+}
