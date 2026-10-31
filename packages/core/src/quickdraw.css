@@ -467,3 +467,21 @@
   background: var(--qd-bar-bg); border: 1px solid var(--qd-border); white-space: nowrap;
 }
 @keyframes qd-help-in { from { opacity: 0 } to { opacity: 1 } }
+
+/* Compact colour palette with a permanent saved tray and scrollable collections. */
+.qd-palette-heading { font-size: 10px; font-weight: 700; letter-spacing: .08em; margin: 8px 0 4px; opacity: .7; }
+.qd-palette-actions { display: flex; gap: 3px; justify-content: space-between; }
+.qd-palette-action { flex: 1; min-width: 28px; padding: 5px; }
+.qd-palette-action svg { width: 15px; height: 15px; }
+.qd-palette-collections { display: flex; flex-direction: column; gap: 7px; max-height: 210px; overflow-y: auto; overscroll-behavior: contain; }
+.qd-palette-collection { padding: 4px 0; border-top: 1px solid var(--qd-divider); }
+.qd-palette-collection-head { display: flex; align-items: center; justify-content: space-between; gap: 3px; }
+.qd-palette-collection-head .qd-palette-action { flex: 0 0 28px; }
+.qd-palette-name { background: transparent; border: 0; color: var(--qd-ink); font-size: 11px; font-weight: 700; text-align: left; min-width: 0; cursor: pointer; }
+.qd-palette-collection .qd-colors { min-height: 24px; }
+.qd-palette-gallery { max-height: 180px; overflow-y: auto; border-top: 1px solid var(--qd-divider); }
+.qd-palette-gallery[hidden] { display: none; }
+.qd-palette-gallery-row { display: flex; align-items: center; gap: 2px; padding: 3px 0; }
+.qd-palette-gallery-row > span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; font-size: 11px; }
+.qd-palette-gallery-row .qd-palette-action { flex: 0 0 24px; }
+.qd-style-pop:has(.qd-palette-collections) { width: min(290px, calc(100% - 16px)); max-height: min(80vh, 540px); overflow-y: auto; }
