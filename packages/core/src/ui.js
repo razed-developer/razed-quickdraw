@@ -286,45 +286,144 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       })
       customRow.append(eyedrop)
     }
-    const swatchKey = 'quickdraw:personal-swatches:v2:' + (editor.container.dataset.qdSwatchOwner || 'default')
-    const readSwatches = () => {
+    // Collections are personal browser preferences, never room document state.
+    const owner = editor.container.dataset.qdSwatchOwner || 'default'
+    const collectionKey = 'quickdraw:swatch-collections:v1:' + owner
+    const legacyKey = 'quickdraw:personal-swatches:v2:' + owner
+    const validHex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
+    const cleanColours = values => Array.isArray(values)
+      ? [...new Set(values.filter(validHex).map(v => v.toLowerCase()))].slice(0,48) : []
+    const readCollections = () => {
       try {
-        const saved = JSON.parse(localStorage.getItem(swatchKey) || '[]')
-        return Array.isArray(saved) ? [...new Set(saved.filter(v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)).map(v => v.toLowerCase()))].slice(0,48) : []
-      } catch { return [] }
+        const saved = JSON.parse(localStorage.getItem(collectionKey) || 'null')
+        if (saved && Array.isArray(saved.collections)) {
+          const collections = saved.collections.slice(0,20).filter(v=>v && typeof v.name==='string')
+            .map(v=>({id:String(v.id).slice(0,80),name:v.name.slice(0,40),colors:cleanColours(v.colors)}))
+          if (collections.length) return {active: saved.active,collections}
+        }
+      } catch {}
+      let legacy = []
+      try { legacy = cleanColours(JSON.parse(localStorage.getItem(legacyKey) || '[]')) } catch {}
+      return {active:'personal',collections:[{id:'personal',name:'My colours',colors:legacy}]}
     }
+    const state = readCollections()
+    const activeCollection = () => state.collections.find(v=>v.id===state.active) || state.collections[0]
+    const persist = () => {
+      try { localStorage.setItem(collectionKey,JSON.stringify(state)) } catch {}
+    }
+    const collectionRow = row('qd-custom-color')
+    const collectionSelect = document.createElement('select')
+    collectionSelect.setAttribute('aria-label','Swatch collection')
+    const newCollection = el('button','qd-opt')
+    newCollection.textContent = '+'
+    newCollection.title = 'New personal collection'
+    const renameCollection = el('button','qd-opt')
+    renameCollection.textContent = 'Rename'
+    const deleteCollection = el('button','qd-opt')
+    deleteCollection.textContent = 'Delete'
+    collectionRow.append(collectionSelect,newCollection,renameCollection,deleteCollection)
     const savedRow = row('qd-colors')
-    const swatches = readSwatches()
+    const controls = row('qd-custom-color')
+    const saveSwatch = el('button','qd-opt')
+    saveSwatch.textContent = 'Save colour'
+    const removeSwatch = el('button','qd-opt')
+    removeSwatch.textContent = 'Remove'
+    removeSwatch.title = 'Remove the selected colour from this collection'
+    const moveLeft = el('button','qd-opt')
+    moveLeft.textContent = '←'
+    moveLeft.title = 'Move selected swatch left'
+    const moveRight = el('button','qd-opt')
+    moveRight.textContent = '→'
+    moveRight.title = 'Move selected swatch right'
+    controls.append(saveSwatch,removeSwatch,moveLeft,moveRight)
+    const shareRow = row('qd-custom-color')
+    const exportBtn = el('button','qd-opt')
+    exportBtn.textContent = 'Share / export'
+    exportBtn.title = 'Copy this collection as portable JSON; sharing is always explicit'
+    const importBtn = el('button','qd-opt')
+    importBtn.textContent = 'Import'
+    importBtn.title = 'Import a collection shared with you'
+    shareRow.append(exportBtn,importBtn)
     const renderSaved = () => {
+      collectionSelect.replaceChildren()
+      for(const collection of state.collections) {
+        const option = document.createElement('option')
+        option.value=collection.id
+        option.textContent=collection.name
+        collectionSelect.append(option)
+      }
+      const active=activeCollection()
+      state.active=active.id
+      collectionSelect.value=active.id
+      deleteCollection.disabled=state.collections.length===1
       savedRow.replaceChildren()
-      for (const value of swatches) {
-        const b = el('button','qd-dot' + (editor.currentStyles().color === value ? ' on' : ''))
+      for(const value of active.colors) {
+        const b=el('button','qd-dot' + (editor.currentStyles().color?.toLowerCase()===value?' on':''))
         b.style.setProperty('--dot',value)
-        b.title = value + ' (right-click to remove)'
+        b.title=value
+        b.setAttribute('aria-label','Use '+value)
         b.addEventListener('click',e=>{e.stopPropagation();editor.setStyle('color',value);restyle()})
-        b.addEventListener('contextmenu',e=>{
-          e.preventDefault();e.stopPropagation()
-          swatches.splice(swatches.indexOf(value),1)
-          try {localStorage.setItem(swatchKey,JSON.stringify(swatches))}catch{}
-          renderSaved()
-        })
         savedRow.append(b)
       }
     }
-    const saveSwatch = el('button','qd-opt')
-    saveSwatch.textContent = 'Save current colour'
-    saveSwatch.title = 'Save this colour to personal swatches'
-    saveSwatch.addEventListener('click',e=>{
-      e.stopPropagation()
-      const value = editor.currentStyles().color
-      const hex = resolveShapeColor(theme(),value || 'blue').stroke.toLowerCase()
-      if (!swatches.includes(hex) && swatches.length < 48) {
-        swatches.push(hex)
-        try {localStorage.setItem(swatchKey,JSON.stringify(swatches))}catch{}
-      }
-      renderSaved()
+    collectionSelect.addEventListener('change',()=>{state.active=collectionSelect.value;persist();renderSaved()})
+    newCollection.addEventListener('click',()=>{
+      if(state.collections.length>=20)return
+      const name=prompt('New collection name')
+      if(!name?.trim())return
+      const id='collection-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)
+      state.collections.push({id,name:name.trim().slice(0,40),colors:[]})
+      state.active=id;persist();renderSaved()
     })
-    p.append(saveSwatch)
+    renameCollection.addEventListener('click',()=>{
+      const active=activeCollection()
+      const name=prompt('Rename collection',active.name)
+      if(!name?.trim())return
+      active.name=name.trim().slice(0,40);persist();renderSaved()
+    })
+    deleteCollection.addEventListener('click',()=>{
+      if(state.collections.length===1)return
+      const active=activeCollection()
+      if(!confirm('Delete collection "'+active.name+'"?'))return
+      state.collections=state.collections.filter(v=>v.id!==active.id)
+      state.active=state.collections[0].id;persist();renderSaved()
+    })
+    const selectedHex=()=>resolveShapeColor(theme(),editor.currentStyles().color||'blue').stroke.toLowerCase()
+    saveSwatch.addEventListener('click',()=>{
+      const colors=activeCollection().colors,value=selectedHex()
+      if(!colors.includes(value)&&colors.length<48)colors.push(value)
+      persist();renderSaved()
+    })
+    removeSwatch.addEventListener('click',()=>{
+      const active=activeCollection(),value=selectedHex()
+      active.colors=active.colors.filter(v=>v!==value)
+      persist();renderSaved()
+    })
+    const move=direction=>{
+      const colors=activeCollection().colors,index=colors.indexOf(selectedHex()),next=index+direction
+      if(index<0||next<0||next>=colors.length)return
+      ;[colors[index],colors[next]]=[colors[next],colors[index]]
+      persist();renderSaved()
+    }
+    moveLeft.addEventListener('click',()=>move(-1))
+    moveRight.addEventListener('click',()=>move(1))
+    exportBtn.addEventListener('click',async()=>{
+      const active=activeCollection()
+      const data=JSON.stringify({format:'quickdraw-swatches-v1',name:active.name,colors:active.colors},null,2)
+      try {await navigator.clipboard.writeText(data);alert('Collection copied. Paste it to share with someone.') }
+      catch {prompt('Copy this collection JSON:',data)}
+    })
+    importBtn.addEventListener('click',()=>{
+      const raw=prompt('Paste a shared Quickdraw collection JSON:')
+      if(!raw)return
+      try {
+        const data=JSON.parse(raw)
+        if(data.format!=='quickdraw-swatches-v1'||typeof data.name!=='string'||!Array.isArray(data.colors)||state.collections.length>=20)throw Error('Invalid collection')
+        const id='import-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)
+        state.collections.push({id,name:data.name.slice(0,40)||'Imported',colors:cleanColours(data.colors)})
+        state.active=id;persist();renderSaved()
+      }catch{alert('Could not import this collection. Check the JSON format and collection limit.')}
+    })
     renderSaved()
     function restyle() {
       const color = editor.currentStyles().color
