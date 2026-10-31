@@ -286,149 +286,170 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       })
       customRow.append(eyedrop)
     }
-    // Collections are personal browser preferences, never room document state.
-    const owner = editor.container.dataset.qdSwatchOwner || 'default'
-    const collectionKey = 'quickdraw:swatch-collections:v1:' + owner
-    const legacyKey = 'quickdraw:personal-swatches:v2:' + owner
-    const validHex = v => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
-    const cleanColours = values => Array.isArray(values)
-      ? [...new Set(values.filter(validHex).map(v => v.toLowerCase()))].slice(0,48) : []
-    const readCollections = () => {
+    // Personal palette state. V2 migrates previous collections into a permanent holding tray.
+    const owner=editor.container.dataset.qdSwatchOwner||'default'
+    const key='quickdraw:palette:v2:'+owner
+    const previousKey='quickdraw:swatch-collections:v1:'+owner
+    const legacyKey='quickdraw:personal-swatches:v2:'+owner
+    const valid=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v)
+    const clean=xs=>Array.isArray(xs)?[...new Set(xs.filter(valid).map(x=>x.toLowerCase()))].slice(0,48):[]
+    const load=()=>{
       try {
-        const saved = JSON.parse(localStorage.getItem(collectionKey) || 'null')
-        if (saved && Array.isArray(saved.collections)) {
-          const collections = saved.collections.slice(0,20).filter(v=>v && typeof v.name==='string')
-            .map(v=>({id:String(v.id).slice(0,80),name:v.name.slice(0,40),colors:cleanColours(v.colors)}))
-          if (collections.length) return {active: saved.active,collections}
+        const v=JSON.parse(localStorage.getItem(key)||'null')
+        if(v&&Array.isArray(v.collections)&&Array.isArray(v.saved))return {
+          saved:clean(v.saved),collections:v.collections.slice(0,20).filter(x=>x&&typeof x.name==='string')
+            .map(x=>({id:String(x.id).slice(0,80),name:x.name.slice(0,40),colors:clean(x.colors)}))
         }
-      } catch {}
-      let legacy = []
-      try { legacy = cleanColours(JSON.parse(localStorage.getItem(legacyKey) || '[]')) } catch {}
-      return {active:'personal',collections:[{id:'personal',name:'My colours',colors:legacy}]}
-    }
-    const state = readCollections()
-    const activeCollection = () => state.collections.find(v=>v.id===state.active) || state.collections[0]
-    const persist = () => {
-      try { localStorage.setItem(collectionKey,JSON.stringify(state)) } catch {}
-    }
-    const collectionRow = row('qd-custom-color')
-    const collectionSelect = document.createElement('select')
-    collectionSelect.setAttribute('aria-label','Swatch collection')
-    const newCollection = el('button','qd-opt')
-    newCollection.textContent = '+'
-    newCollection.title = 'New personal collection'
-    const renameCollection = el('button','qd-opt')
-    renameCollection.textContent = 'Rename'
-    const deleteCollection = el('button','qd-opt')
-    deleteCollection.textContent = 'Delete'
-    collectionRow.append(collectionSelect,newCollection,renameCollection,deleteCollection)
-    const savedRow = row('qd-colors')
-    const controls = row('qd-custom-color')
-    const saveSwatch = el('button','qd-opt')
-    saveSwatch.textContent = 'Save colour'
-    const removeSwatch = el('button','qd-opt')
-    removeSwatch.textContent = 'Remove'
-    removeSwatch.title = 'Remove the selected colour from this collection'
-    const moveLeft = el('button','qd-opt')
-    moveLeft.textContent = '←'
-    moveLeft.title = 'Move selected swatch left'
-    const moveRight = el('button','qd-opt')
-    moveRight.textContent = '→'
-    moveRight.title = 'Move selected swatch right'
-    controls.append(saveSwatch,removeSwatch,moveLeft,moveRight)
-    const shareRow = row('qd-custom-color')
-    const exportBtn = el('button','qd-opt')
-    exportBtn.textContent = 'Share / export'
-    exportBtn.title = 'Copy this collection as portable JSON; sharing is always explicit'
-    const importBtn = el('button','qd-opt')
-    importBtn.textContent = 'Import'
-    importBtn.title = 'Import a collection shared with you'
-    shareRow.append(exportBtn,importBtn)
-    const renderSaved = () => {
-      collectionSelect.replaceChildren()
-      for(const collection of state.collections) {
-        const option = document.createElement('option')
-        option.value=collection.id
-        option.textContent=collection.name
-        collectionSelect.append(option)
-      }
-      const active=activeCollection()
-      state.active=active.id
-      collectionSelect.value=active.id
-      deleteCollection.disabled=state.collections.length===1
-      savedRow.replaceChildren()
-      for(const value of active.colors) {
-        const b=el('button','qd-dot' + (editor.currentStyles().color?.toLowerCase()===value?' on':''))
-        b.style.setProperty('--dot',value)
-        b.title=value
-        b.setAttribute('aria-label','Use '+value)
-        b.addEventListener('click',e=>{e.stopPropagation();editor.setStyle('color',value);restyle()})
-        savedRow.append(b)
-      }
-    }
-    collectionSelect.addEventListener('change',()=>{state.active=collectionSelect.value;persist();renderSaved()})
-    newCollection.addEventListener('click',()=>{
-      if(state.collections.length>=20)return
-      const name=prompt('New collection name')
-      if(!name?.trim())return
-      const id='collection-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)
-      state.collections.push({id,name:name.trim().slice(0,40),colors:[]})
-      state.active=id;persist();renderSaved()
-    })
-    renameCollection.addEventListener('click',()=>{
-      const active=activeCollection()
-      const name=prompt('Rename collection',active.name)
-      if(!name?.trim())return
-      active.name=name.trim().slice(0,40);persist();renderSaved()
-    })
-    deleteCollection.addEventListener('click',()=>{
-      if(state.collections.length===1)return
-      const active=activeCollection()
-      if(!confirm('Delete collection "'+active.name+'"?'))return
-      state.collections=state.collections.filter(v=>v.id!==active.id)
-      state.active=state.collections[0].id;persist();renderSaved()
-    })
-    const selectedHex=()=>resolveShapeColor(theme(),editor.currentStyles().color||'blue').stroke.toLowerCase()
-    saveSwatch.addEventListener('click',()=>{
-      const colors=activeCollection().colors,value=selectedHex()
-      if(!colors.includes(value)&&colors.length<48)colors.push(value)
-      persist();renderSaved()
-    })
-    removeSwatch.addEventListener('click',()=>{
-      const active=activeCollection(),value=selectedHex()
-      active.colors=active.colors.filter(v=>v!==value)
-      persist();renderSaved()
-    })
-    const move=direction=>{
-      const colors=activeCollection().colors,index=colors.indexOf(selectedHex()),next=index+direction
-      if(index<0||next<0||next>=colors.length)return
-      ;[colors[index],colors[next]]=[colors[next],colors[index]]
-      persist();renderSaved()
-    }
-    moveLeft.addEventListener('click',()=>move(-1))
-    moveRight.addEventListener('click',()=>move(1))
-    exportBtn.addEventListener('click',async()=>{
-      const active=activeCollection()
-      const data=JSON.stringify({format:'quickdraw-swatches-v1',name:active.name,colors:active.colors},null,2)
-      try {await navigator.clipboard.writeText(data);alert('Collection copied. Paste it to share with someone.') }
-      catch {prompt('Copy this collection JSON:',data)}
-    })
-    importBtn.addEventListener('click',()=>{
-      const raw=prompt('Paste a shared Quickdraw collection JSON:')
-      if(!raw)return
+      }catch{}
       try {
-        const data=JSON.parse(raw)
-        if(data.format!=='quickdraw-swatches-v1'||typeof data.name!=='string'||!Array.isArray(data.colors)||state.collections.length>=20)throw Error('Invalid collection')
-        const id='import-'+Date.now()+'-'+Math.random().toString(36).slice(2,8)
-        state.collections.push({id,name:data.name.slice(0,40)||'Imported',colors:cleanColours(data.colors)})
-        state.active=id;persist();renderSaved()
-      }catch{alert('Could not import this collection. Check the JSON format and collection limit.')}
+        const v=JSON.parse(localStorage.getItem(previousKey)||'null')
+        if(v&&Array.isArray(v.collections))return {saved:[],collections:v.collections.slice(0,20)
+          .filter(x=>x&&typeof x.name==='string').map(x=>({id:String(x.id).slice(0,80),name:x.name.slice(0,40),colors:clean(x.colors)}))}
+      }catch{}
+      let saved=[]
+      try{saved=clean(JSON.parse(localStorage.getItem(legacyKey)||'[]'))}catch{}
+      return {saved,collections:[]}
+    }
+    const state=load()
+    const persist=()=>{try{localStorage.setItem(key,JSON.stringify(state))}catch{}}
+    const selectedHex=()=>resolveShapeColor(theme(),editor.currentStyles().color||'blue').stroke.toLowerCase()
+    const icon=(name,title,fn)=>{
+      const b=el('button','qd-opt qd-palette-action')
+      b.innerHTML=ICONS[name]||name
+      b.title=title;b.setAttribute('aria-label',title)
+      b.addEventListener('click',e=>{e.stopPropagation();fn()})
+      return b
+    }
+    const saveColor=(target,value)=>{
+      value=value.toLowerCase()
+      if(valid(value)&&!target.includes(value)&&target.length<48){target.push(value);persist();render()}
+    }
+    const swatch=(value,container,onEdit)=>{
+      const b=el('button','qd-dot'+(selectedHex()===value?' on':''))
+      b.style.setProperty('--dot',value)
+      b.title=value+' — click to apply, double-click to edit'
+      b.setAttribute('aria-label','Apply '+value)
+      b.draggable=true
+      b.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',value);e.dataTransfer.effectAllowed='copy'})
+      b.addEventListener('click',e=>{e.stopPropagation();applyColor(value)})
+      b.addEventListener('dblclick',e=>{e.stopPropagation();onEdit?.(value)})
+      container.append(b)
+      return b
+    }
+    const acceptDrop=(element,fn)=>{
+      element.addEventListener('dragover',e=>{if(valid(e.dataTransfer.types.includes('text/plain')?'#000000':'')||e.dataTransfer.types.includes('text/plain'))e.preventDefault()})
+      element.addEventListener('drop',e=>{e.preventDefault();const value=e.dataTransfer.getData('text/plain');if(valid(value))fn(value)})
+    }
+    const heading=(label)=>{
+      const h=el('div','qd-palette-heading');h.textContent=label;p.append(h);return h
+    }
+    heading('SAVED')
+    const savedRow=row('qd-colors')
+    const savedActions=row('qd-palette-actions')
+    savedActions.append(
+      icon('save','Save selected colour',()=>saveColor(state.saved,selectedHex())),
+      icon('copy','Create collection from saved colours',()=>createCollection(true)),
+      icon('download','Import JSON file',()=>importFile.click()),
+      icon('upload','Export saved colours as JSON file',()=>downloadJSON({format:'quickdraw-swatches-v1',name:'Saved colours',colors:state.saved},'quickdraw-saved.json'))
+    )
+    const importFile=document.createElement('input')
+    importFile.type='file';importFile.accept='.json,application/json';importFile.hidden=true;p.append(importFile)
+    importFile.addEventListener('change',async()=>{
+      const file=importFile.files?.[0];if(!file)return
+      try{
+        const v=JSON.parse(await file.text())
+        if(v.format!=='quickdraw-swatches-v1'||!Array.isArray(v.colors))throw Error()
+        if(state.collections.length>=20)throw Error()
+        state.collections.push({id:'import-'+Date.now(),name:String(v.name||'Imported').slice(0,40),colors:clean(v.colors)})
+        persist();render()
+      }catch{alert('Unable to import this swatch file.')}
+      importFile.value=''
     })
-    renderSaved()
+    function downloadJSON(data,name){
+      const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'})
+      const url=URL.createObjectURL(blob),a=document.createElement('a')
+      a.href=url;a.download=name;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000)
+    }
+    function createCollection(copySaved=false){
+      if(state.collections.length>=20)return
+      const number=state.collections.length+1
+      state.collections.push({id:'collection-'+Date.now()+'-'+Math.random().toString(36).slice(2,6),
+        name:'Collection #'+number,colors:copySaved?[...state.saved]:[]})
+      persist();render()
+    }
+    const columns=el('div','qd-palette-collections')
+    p.append(columns)
+    const collectionsHeader=heading('COLLECTIONS')
+    const collectionActions=row('qd-palette-actions')
+    collectionActions.append(icon('copy','New empty collection',()=>createCollection()),icon('settings','Collection gallery',()=>{gallery.hidden=!gallery.hidden}))
+    const gallery=el('div','qd-palette-gallery');gallery.hidden=true;p.append(gallery)
+    function render(){
+      savedRow.replaceChildren()
+      for(const value of state.saved)swatch(value,savedRow,v=>{
+        const choice=prompt('Edit saved colour (HEX), or leave blank to delete',v)
+        if(choice===null)return
+        if(choice==='')state.saved=state.saved.filter(x=>x!==v)
+        else if(valid(choice))state.saved=clean(state.saved.map(x=>x===v?choice:x))
+        persist();render()
+      })
+      columns.replaceChildren();gallery.replaceChildren()
+      for(const [index,collection] of state.collections.entries()){
+        const section=el('div','qd-palette-collection')
+        const head=el('div','qd-palette-collection-head')
+        const name=el('button','qd-palette-name')
+        name.textContent=collection.name
+        name.title='Double-click to rename'
+        name.addEventListener('dblclick',()=>{
+          const next=prompt('Collection name',collection.name)
+          if(next?.trim()){collection.name=next.trim().slice(0,40);persist();render()}
+        })
+        head.append(name)
+        head.append(icon('share-2','Export this collection',()=>downloadJSON({format:'quickdraw-swatches-v1',name:collection.name,colors:collection.colors},'quickdraw-'+collection.id+'.json')))
+        section.append(head)
+        const dots=el('div','qd-colors')
+        for(const value of collection.colors)swatch(value,dots,v=>{
+          const choice=prompt('Edit colour (HEX), or leave blank to delete',v)
+          if(choice===null)return
+          if(choice==='')collection.colors=collection.colors.filter(x=>x!==v)
+          else if(valid(choice))collection.colors=clean(collection.colors.map(x=>x===v?choice:x))
+          persist();render()
+        })
+        acceptDrop(dots,value=>saveColor(collection.colors,value))
+        section.append(dots);columns.append(section)
+        const manage=el('div','qd-palette-gallery-row')
+        const title=el('span');title.textContent=collection.name;manage.append(title)
+        manage.append(icon('arrow-up','Move collection up',()=>moveCollection(index,-1)))
+        manage.append(icon('arrow-down','Move collection down',()=>moveCollection(index,1)))
+        manage.append(icon('pencil','Rename collection',()=>{
+          const next=prompt('Collection name',collection.name)
+          if(next?.trim()){collection.name=next.trim().slice(0,40);persist();render()}
+        }))
+        manage.append(icon('trash-2','Delete collection',()=>{
+          if(confirm('Delete '+collection.name+'?')){state.collections.splice(index,1);persist();render()}
+        }))
+        manage.draggable=true
+        manage.addEventListener('dragstart',e=>e.dataTransfer.setData('application/x-quickdraw-collection',String(index)))
+        manage.addEventListener('dragover',e=>e.preventDefault())
+        manage.addEventListener('drop',e=>{
+          e.preventDefault();const from=Number(e.dataTransfer.getData('application/x-quickdraw-collection'))
+          if(Number.isInteger(from)&&from>=0&&from<state.collections.length&&from!==index){
+            const [item]=state.collections.splice(from,1);state.collections.splice(index,0,item);persist();render()
+          }
+        })
+        gallery.append(manage)
+      }
+    }
+    function moveCollection(index,dir){
+      const next=index+dir
+      if(next<0||next>=state.collections.length)return
+      ;[state.collections[index],state.collections[next]]=[state.collections[next],state.collections[index]]
+      persist();render()
+    }
+    render()
     function restyle() {
       const color = editor.currentStyles().color
       colors.querySelectorAll('.qd-dot').forEach((b,i)=>b.classList.toggle('on',COLOR_IDS[i] === color))
-      renderSaved()
+      render()
       refresh()
     }
   }
