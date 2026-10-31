@@ -526,3 +526,8 @@
  .qd-palette-left { border-right: 0; border-bottom: 1px solid var(--qd-divider); padding: 3px 2px 9px; }
  .qd-palette-right { padding: 9px 2px 3px; }
 }
+
+.qd-palette-inline-name { width: 100%; min-width: 0; box-sizing: border-box; font: inherit; font-size: 11px; font-weight: 700; color: var(--qd-ink); background: var(--qd-pop-bg); border: 1px solid var(--qd-ink-soft); border-radius: 3px; padding: 2px 3px; }
+.qd-palette-collection-head .qd-palette-inline-name { flex: 1; }
+.qd-palette-saved-header .qd-palette-actions { flex-wrap: nowrap; }
+.qd-palette-saved-header .qd-palette-action { flex-basis: 21px; width: 21px; min-width: 21px; padding: 2px; }
