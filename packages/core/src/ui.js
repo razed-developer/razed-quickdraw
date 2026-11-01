@@ -665,7 +665,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
         const gallery=el('div','qd-canvas-gallery')
         gallery.setAttribute('role','dialog')
         gallery.setAttribute('aria-label','Canvas settings')
-        gallery.style.cssText='position:absolute;z-index:60;overflow:auto;background:var(--qd-panel,#fff);color:var(--qd-text,#222);border:1px solid #b5bac3;box-shadow:0 8px 28px #0003;padding:12px;box-sizing:border-box;'
+        gallery.style.cssText='position:absolute;z-index:60;pointer-events:auto;overflow:auto;background:var(--qd-panel,#fff);color:var(--qd-text,#222);border:1px solid #b5bac3;box-shadow:0 8px 28px #0003;padding:12px;box-sizing:border-box;'
         ui.append(gallery)
         canvasPanel=gallery
         const positionGallery=()=>{
