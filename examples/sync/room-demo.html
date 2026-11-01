@@ -23,7 +23,7 @@ button{cursor:pointer;padding:7px 10px}
 @media(max-width:850px){main{grid-template-columns:1fr}.board{height:50vh}}
 #recovery{margin-top:12px;background:#fff;border:2px solid #b07824;padding:14px;display:none}
 #recovery button{margin:5px}
-.layout-lab{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin-bottom:12px;background:white;border:1px solid #aabfc0}
+.layout-lab:not([hidden]){display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin-bottom:12px;background:white;border:1px solid #aabfc0}
 .layout-lab label{display:inline-flex;align-items:center;gap:6px}
 .layout-lab select,.layout-lab input{padding:5px}
 .layout-lab input[type=color]{padding:1px;width:36px;height:30px}
@@ -39,7 +39,7 @@ button{cursor:pointer;padding:7px 10px}
 <div><label>Room <input id="room" value="demo" maxlength="64"></label>
 <button id="restart">Connect room</button></div>
 </header>
-<div class="layout-lab" aria-label="Canvas region layout preview">
+<div class="layout-lab" hidden aria-label="Legacy canvas region layout controls">
 <label><input id="regions-enabled" type="checkbox"> Enable regions</label>
 <label>Layout <select id="region-layout">
 <option value="vertical">Vertical split</option><option value="horizontal">Horizontal split</option>
