@@ -718,3 +718,38 @@ describe('Arrange alignment', () => {
     expect(editor.store.get(a.id).x).toBe(10)
   })
 })
+
+describe('Arrange distribution', () => {
+  const make = (id, x, y, w = 20, h = 20) => ({
+    id, typeName: 'shape', type: 'geo', x, y, z: x + y + 1,
+    rot: 0, props: { w, h },
+  })
+  it('spaces horizontal shapes by their edges and preserves endpoints and undo', () => {
+    const shapes = [make('left', 0, 10, 20), make('middle', 35, 30, 40), make('right', 160, 50, 20)]
+    shapes.forEach(s => editor.store.put(s))
+    editor.setSelection(shapes.map(s => s.id))
+    editor.distributeSelection('horizontal')
+    expect(editor.store.get('middle').x).toBe(70)
+    expect(editor.store.get('left').x).toBe(0)
+    expect(editor.store.get('right').x).toBe(160)
+    expect(editor.store.get('middle').y).toBe(30)
+    editor.store.undo()
+    expect(editor.store.get('middle').x).toBe(35)
+  })
+  it('distributes vertically without moving the top and bottom shapes', () => {
+    const shapes = [make('top', 0, 0, 20, 10), make('middle', 20, 20, 20, 30), make('bottom', 40, 110, 20, 10)]
+    shapes.forEach(s => editor.store.put(s))
+    editor.setSelection(shapes.map(s => s.id))
+    editor.distributeSelection('vertical')
+    expect(editor.store.get('middle').y).toBe(45)
+    expect(editor.store.get('top').y).toBe(0)
+    expect(editor.store.get('bottom').y).toBe(110)
+  })
+  it('does nothing with fewer than three shapes', () => {
+    const shapes = [make('a', 0, 0), make('b', 100, 0)]
+    shapes.forEach(s => editor.store.put(s))
+    editor.setSelection(shapes.map(s => s.id))
+    editor.distributeSelection('horizontal')
+    expect(editor.store.get('b').x).toBe(100)
+  })
+})
