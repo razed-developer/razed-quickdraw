@@ -690,9 +690,10 @@ describe('clipboard stacking', () => {
   })
   it('places ordinary copied shapes on top with an offset', () => {
     const shape = { id: 'copy-a', typeName: 'shape', type: 'geo', x: 10, y: 20, z: 2, rot: 0, props: { w: 30, h: 30 } }
+    editor.store.put({ ...shape, id: 'existing-a' })
     editor._pasteShapes({ quickdraw: 1, shapes: [shape], assets: {} })
     const pasted = editor.store.get([...editor.selection][0])
     expect([pasted.x, pasted.y]).toEqual([26, 36])
-    expect(pasted.z).toBeGreaterThan(shape.z)
+    expect(pasted.z).toBeGreaterThan(editor.store.get('existing-a').z)
   })
 })
