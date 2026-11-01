@@ -1,49 +1,97 @@
-// Animated GIFs are DOM images positioned over the canvas. The canvas retains
-// its ordinary static rendering for export; animation never drives a redraw loop.
+import { planMediaLayers } from './media-layer-plan.js'
+
+// Screen-only compositor. Export/capture still use Editor.renderScene's normal
+// ordered single-canvas pass; only the interactive viewport is layered.
 export function mountGifOverlay(editor, { enabled = false } = {}) {
   if (!enabled) return { destroy() {}, setPlaying() {} }
   const layer = document.createElement('div')
   layer.className = 'qd-gif-layer'
   layer.style.cssText = 'position:absolute;inset:0;overflow:hidden;pointer-events:none;z-index:2'
   editor.container.append(layer)
-  const nodes = new Map()
+  // Reuse GIF elements by shape ID so normal board edits do not restart playback.
+  const gifs = new Map()
+  const canvases = []
   let playing = true
+
   function update() {
-    const active = new Set()
-    for (const shape of editor.store.shapes()) {
-      if (shape.type !== 'image') continue
-      const asset = editor.store.asset(shape.props?.assetId)
-      if (!asset || !(asset.animated || asset.mimeType === 'image/gif' || /^data:image\/gif[;,]/i.test(asset.src) || /\.gif(?:[?#]|$)/i.test(asset.src))) continue
-      active.add(shape.id)
-      let node = nodes.get(shape.id)
+    if (!playing) return
+    const plan = planMediaLayers(editor.shapesSorted(), id => editor.store.asset(id))
+    const { w, h } = editor.viewSize()
+    const dpr = Math.min(2, window.devicePixelRatio || 1)
+    const ordered = []
+    const usedGifs = new Set()
+    let canvasIndex = 0
+    for (const entry of plan) {
+      if (entry.kind === 'canvas') {
+        let canvas = canvases[canvasIndex++]
+        if (!canvas) {
+          canvas = document.createElement('canvas')
+          canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;pointer-events:none'
+          canvases.push(canvas)
+        }
+        const cw = Math.round(w * dpr), ch = Math.round(h * dpr)
+        if (canvas.width !== cw) canvas.width = cw
+        if (canvas.height !== ch) canvas.height = ch
+        editor.renderScene(canvas.getContext('2d'), editor.camera, w, h, {
+          dpr, background: false, hideEditing: true, shapes: entry.shapes,
+        })
+        ordered.push(canvas)
+        continue
+      }
+      const { shape, asset } = entry
+      usedGifs.add(shape.id)
+      let node = gifs.get(shape.id)
       if (!node) {
         node = document.createElement('img')
         node.alt = ''
         node.setAttribute('aria-hidden', 'true')
         node.style.cssText = 'position:absolute;pointer-events:none;transform-origin:center center;object-fit:fill'
-        nodes.set(shape.id, node)
-        layer.append(node)
+        gifs.set(shape.id, node)
       }
       if (node.dataset.assetSrc !== asset.src) {
         node.src = asset.src
         node.dataset.assetSrc = asset.src
       }
-      const { x, y } = editor.pageToScreen(shape.x, shape.y)
-      const zoom = editor.camera.z
-      node.style.left = x + 'px'
-      node.style.top = y + 'px'
-      node.style.width = shape.props.w * zoom + 'px'
-      node.style.height = shape.props.h * zoom + 'px'
+      const pos = editor.pageToScreen(shape.x, shape.y)
+      node.style.left = pos.x + 'px'
+      node.style.top = pos.y + 'px'
+      node.style.width = shape.props.w * editor.camera.z + 'px'
+      node.style.height = shape.props.h * editor.camera.z + 'px'
       node.style.transform = 'rotate(' + (shape.rot || 0) + 'rad)'
-      node.style.display = playing ? '' : 'none'
+      ordered.push(node)
     }
-    for (const [id, node] of nodes) if (!active.has(id)) { node.remove(); nodes.delete(id) }
+    for (const [id, node] of gifs) {
+      if (!usedGifs.has(id)) { node.remove(); gifs.delete(id) }
+    }
+    for (let i = canvasIndex; i < canvases.length; i++) canvases[i].remove()
+    canvases.length = canvasIndex
+    // append() moves existing nodes without recreating them or resetting src.
+    layer.append(...ordered)
   }
+
+  editor._mediaCompositorActive = true
+  // Keep editor selection handles above all media and below toolbar chrome.
+  const oldOverlayZ = editor.overlay.style.zIndex
+  editor.overlay.style.zIndex = '3'
   const offRender = editor.on('render', update)
-  const offStore = editor.store.listen(() => editor.requestRender())
   update()
+  editor.requestRender()
   return {
-    setPlaying(value) { playing = !!value; update() },
-    destroy() { offRender(); offStore(); layer.remove(); nodes.clear() },
+    setPlaying(value) {
+      playing = !!value
+      editor._mediaCompositorActive = playing
+      layer.style.display = playing ? '' : 'none'
+      if (playing) update()
+      editor.requestRender()
+    },
+    destroy() {
+      offRender()
+      editor._mediaCompositorActive = false
+      editor.overlay.style.zIndex = oldOverlayZ
+      layer.remove()
+      gifs.clear()
+      canvases.length = 0
+      editor.requestRender()
+    },
   }
 }
