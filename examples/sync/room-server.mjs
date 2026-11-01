@@ -24,6 +24,7 @@ export function createRoomSyncServer({ dataDir = resolve(dirname(fileURLToPath(i
   const root = resolve(directory, '../..')
   const assets = new Map([
     ['/demo', [resolve(directory, 'room-demo.html'), 'text/html; charset=utf-8']],
+    ['/feature-lab', [resolve(directory, 'feature-lab.html'), 'text/html; charset=utf-8']],
     ['/room-client.mjs', [resolve(directory, 'room-client.mjs'), 'text/javascript; charset=utf-8']],
     ['/room-merge.mjs', [resolve(directory, 'room-merge.mjs'), 'text/javascript; charset=utf-8']],
     ['/core/index.js', [resolve(root, 'packages/core/src/index.js'), 'text/javascript; charset=utf-8']],
