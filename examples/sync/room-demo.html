@@ -192,9 +192,27 @@ function start() {
     try { savedColour = localStorage.getItem(colourKey) } catch { /* storage unavailable */ }
     const validColour = savedColour && (/^#[0-9a-f]{6}$/i.test(savedColour) ||
       ['black','grey','light-violet','violet','blue','light-blue','yellow','orange','green','light-green','light-red','red'].includes(savedColour))
-    document.getElementById(`board-${name}`).dataset.qdSwatchOwner = name
-    const board = createQuickdraw({ container: document.getElementById(`board-${name}`), theme:'light', grid:'dots', watermark:false,
+    const boardElement=document.getElementById(`board-${name}`)
+    boardElement.dataset.qdSwatchOwner = name
+    // Camera belongs to this participant and room, not the shared document.
+    // Center world (0,0) on first visit; restore the last view on refresh.
+    const cameraKey='quickdraw:demo:camera:'+room+':'+name
+    let initialCamera=null
+    try {
+      const saved=JSON.parse(localStorage.getItem(cameraKey)||'null')
+      if(saved && [saved.x,saved.y,saved.z].every(Number.isFinite) && saved.z>0)
+        initialCamera={x:saved.x,y:saved.y,z:saved.z}
+    } catch { /* unavailable or malformed camera */ }
+    if(!initialCamera){
+      const bounds=boardElement.getBoundingClientRect()
+      initialCamera={x:bounds.width/2,y:bounds.height/2,z:1}
+    }
+    const board = createQuickdraw({ container: boardElement, theme:'light', grid:'dots', watermark:false,
+      camera:initialCamera,
       ...(validColour ? { styles: { color: savedColour } } : {}) })
+    cameraCleanups.push(board.editor.on('camera',()=>{
+      try {localStorage.setItem(cameraKey,JSON.stringify(board.editor.camera))} catch { /* storage unavailable */ }
+    }))
     const saveColour = () => {
       try { localStorage.setItem(colourKey, board.editor.styles.color) } catch { /* private mode */ }
     }
