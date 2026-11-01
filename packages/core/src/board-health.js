@@ -62,7 +62,13 @@ export function mountBoardHealth(editor, { enabled = true } = {}) {
       body.append(div)
     }
   }
-  const off = editor.store.listen(update)
+  // Coalesce rapid drawing transactions into one measurement per animation frame.
+  let frame = 0
+  const schedule = () => {
+    if (frame) return
+    frame = requestAnimationFrame(() => { frame = 0; update() })
+  }
+  const off = editor.store.listen(schedule)
   update()
-  return { destroy() { off(); details.remove() } }
+  return { destroy() { off(); if (frame) cancelAnimationFrame(frame); details.remove() } }
 }
