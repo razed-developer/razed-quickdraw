@@ -49,6 +49,7 @@ export function createQuickdraw(opts) {
     onSave: opts.onSave,
     themeToggle: opts.themeToggle,
     gridControl: opts.gridControl,
+    mediaProviders: opts.mediaProviders,
   })
   const watermark = opts.watermark === false ? null : buildWatermark(editor)
   return {
