@@ -104,12 +104,15 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
   root.appendChild(ui)
 
   let popover = null // { name, el }
+  let canvasPanel = null
+  const closeCanvasPanel = () => { if (canvasPanel) { canvasPanel.dispatchEvent(new Event('qd-close'));canvasPanel.remove();canvasPanel = null } }
   const closePopover = () => {
     if (popover) { popover.el.remove(); popover = null; refresh() }
   }
   const openPopover = (name, build, anchor) => {
     if (popover?.name === name) return closePopover()
     closePopover()
+    closeCanvasPanel()
     const p = el('div', 'qd-popover')
     build(p)
     ui.appendChild(p)
@@ -657,13 +660,31 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       p.append(trigger)
       trigger.onclick=e=>{
         e.stopPropagation()
-        // A single non-cascading panel replaces the old three-deep flyouts.
-        const previous=p.querySelector('.qd-canvas-gallery')
-        if(previous){previous.remove();return}
+        closePopover()
+        closeCanvasPanel()
         const gallery=el('div','qd-canvas-gallery')
-        gallery.style.cssText='position:absolute;z-index:50;width:min(350px,calc(100vw - 30px));max-height:min(74vh,630px);overflow:auto;background:var(--qd-panel,#fff);color:var(--qd-text,#222);border:1px solid #b5bac3;box-shadow:0 8px 28px #0003;padding:12px;box-sizing:border-box;'
-        gallery.style.left='0';gallery.style.bottom='100%'
-        p.append(gallery)
+        gallery.setAttribute('role','dialog')
+        gallery.setAttribute('aria-label','Canvas settings')
+        gallery.style.cssText='position:absolute;z-index:60;overflow:auto;background:var(--qd-panel,#fff);color:var(--qd-text,#222);border:1px solid #b5bac3;box-shadow:0 8px 28px #0003;padding:12px;box-sizing:border-box;'
+        ui.append(gallery)
+        canvasPanel=gallery
+        const positionGallery=()=>{
+          if(canvasPanel!==gallery)return
+          const width=root.clientWidth,height=root.clientHeight
+          const inset=8
+          const w=Math.min(350,Math.max(0,width-inset*2))
+          const h=Math.max(0,height-inset*2)
+          gallery.style.width=w+'px'
+          gallery.style.maxHeight=h+'px'
+          gallery.style.left=Math.max(inset,(width-w)/2)+'px'
+          gallery.style.top=Math.max(inset,(height-Math.min(gallery.scrollHeight,h))/2)+'px'
+          gallery.style.bottom='auto'
+        }
+        requestAnimationFrame(positionGallery)
+        const panelResize=new ResizeObserver(positionGallery)
+        panelResize.observe(root)
+        // Observer is tied to this gallery and disconnected on closure.
+        gallery.addEventListener('qd-close',()=>panelResize.disconnect(),{once:true})
         let selectedRegion=0
         const heading=(title)=>{
           const h=document.createElement('div');h.textContent=title;h.style.cssText='font-size:13px;font-weight:600;margin:8px 0';gallery.append(h)
@@ -677,10 +698,10 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
           const top=document.createElement('div');top.style.cssText='display:flex;align-items:center;justify-content:space-between;'
           const title=document.createElement('strong');title.textContent='Canvas settings'
           const done=document.createElement('button');done.textContent='Done';done.style.cssText=css+'padding:5px 10px'
-          done.onclick=e=>{e.stopPropagation();gallery.remove()}
+          done.onclick=e=>{e.stopPropagation();closeCanvasPanel()}
           top.append(title,done);gallery.append(top)
           heading('Layout')
-          const lg=tiles(4)
+          const lg=tiles(root.clientWidth<400?2:4)
           for(const [id,label] of Object.entries(layouts))cell(lg,label,layoutSvg(id),id==='single'?!state.enabled:state.enabled&&state.layout===id,()=>{
             if(id==='single')save({enabled:false})
             else save({enabled:true,layout:id,backgrounds:Array.from({length:counts[id]},(_,i)=>state.backgrounds[i]||{type:'solid'})})
@@ -699,7 +720,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
             gallery.append(preview)
           }
           const bg=state.enabled?(state.backgrounds[selectedRegion]||{type:'solid'}):{type:({none:'solid',lines:'graph',ruled:'paper',dots:'dots',crosses:'crosses',iso:'iso'})[state.grid]||'solid'}
-          const pg=tiles(4)
+          const pg=tiles(root.clientWidth<400?2:4)
           for(const [id,label] of Object.entries(patterns))cell(pg,label,patternSvg(id),bg.type===id,()=>{
             if(state.enabled){
               const next=Array.from({length:counts[state.layout]},(_,i)=>state.backgrounds[i]||{type:'solid'})
@@ -917,6 +938,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       ro.disconnect()
       root.removeEventListener('pointerdown', closeOnCanvas, { capture: true })
       closeHelp()
+      closeCanvasPanel()
       ui.remove()
     },
   }
