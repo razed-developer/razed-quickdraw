@@ -83,6 +83,15 @@ export class Editor {
 
     this._bind()
     this._unsubStore = this.store.listen(() => {
+      const settings=this.store.get('quickdraw:board-settings:regions')
+      if(settings?.typeName==='board-settings'){
+        try {
+          if(settings.enabled && settings.layout) this.setRegions(settings.layout,settings.backgrounds||[])
+          this.setFeatures({regions:!!settings.enabled})
+          if(settings.grid && GRID_IDS.includes(settings.grid)) this.setGrid(settings.grid)
+          this.showRegionBoundaries=!!settings.boundaries
+        } catch(e){console.warn('Invalid shared canvas settings',e)}
+      }
       this._pruneSelection()
       this.requestRender()
       this.emit('change')
