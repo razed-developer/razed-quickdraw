@@ -1,3 +1,4 @@
+import { createRegionLayout, regionRectangles } from './regions.js'
 // The Quickdraw editor: camera, tools, selection, input and rendering over a
 // Store. Framework-free — the React and React Native SDKs wrap it, plain
 // pages use it bare, and every host gets the identical feel.
@@ -32,11 +33,12 @@ const bendMidpoint = (pr) => {
 }
 
 export class Editor {
-  constructor({ container, store, theme = 'light', grid = 'lines', readonly = false, camera, styles, geoKind } = {}) {
+  constructor({ container, store, theme = 'light', grid = 'lines', readonly = false, camera, styles, geoKind, regions = null } = {}) {
     this.container = container
     this.store = store || new Store()
     this.theme = themeOf(theme)
     this.grid = GRID_IDS.includes(grid) ? grid : 'lines'
+    this.regions = regions ? createRegionLayout(regions.layout, regions.backgrounds) : null
     this.readonly = !!readonly
     this.camera = camera || { x: 0, y: 0, z: 1 }
     this.styles = { ...DEFAULT_STYLES, ...(styles || {}) }
@@ -1521,7 +1523,10 @@ export class Editor {
     } else {
       ctx.clearRect(0, 0, w * dpr, h * dpr)
     }
-    if (background) this._drawGrid(ctx, cam, w * dpr, h * dpr, dpr)
+    if (background) {
+      if (this.regions) this._drawRegionBackgrounds(ctx, cam, w, h, dpr)
+      else this._drawGrid(ctx, cam, w * dpr, h * dpr, dpr)
+    }
     ctx.setTransform(cam.z * dpr, 0, 0, cam.z * dpr, cam.x * cam.z * dpr, cam.y * cam.z * dpr)
     const vp = { x: -cam.x, y: -cam.y, w: w / cam.z, h: h / cam.z }
     const pad = 64 / cam.z
@@ -1539,6 +1544,39 @@ export class Editor {
       })
     }
     ctx.setTransform(1, 0, 0, 1, 0, 0)
+  }
+
+  // Clip region fills to the current viewport; region boundaries are unbounded
+  // world axes, never finite pages. Shapes are drawn once above all regions.
+  _drawRegionBackgrounds(ctx, cam, w, h, dpr) {
+    if (!(cam.z > 0)) return
+    const vp={x:-cam.x,y:-cam.y,w:w/cam.z,h:h/cam.z}
+    const fills={solid:this.theme.background,graph:'#f9fbff',dots:this.theme.background,
+      paper:'#fffdf5',dark:'#242933'}
+    const previousGrid=this.grid
+    for(const rect of regionRectangles(this.regions.layout,vp)){
+      const background=this.regions.backgrounds[rect.region]
+      const sx=(rect.x+cam.x)*cam.z*dpr,sy=(rect.y+cam.y)*cam.z*dpr
+      const sw=rect.w*cam.z*dpr,sh=rect.h*cam.z*dpr
+      ctx.save()
+      ctx.beginPath();ctx.rect(sx,sy,sw,sh);ctx.clip()
+      ctx.fillStyle=background.type==='custom'?background.color:fills[background.type]||this.theme.background
+      ctx.fillRect(sx,sy,sw,sh)
+      this.grid=background.type==='graph'?'lines':background.type==='dots'?'dots':background.type==='paper'?'ruled':'none'
+      if(this.grid!=='none')this._drawGrid(ctx,cam,w*dpr,h*dpr,dpr)
+      ctx.restore()
+    }
+    this.grid=previousGrid
+  }
+
+  setRegions(layout, backgrounds=[]) {
+    this.regions=createRegionLayout(layout,backgrounds)
+    this.requestRender()
+  }
+
+  clearRegions() {
+    this.regions=null
+    this.requestRender()
   }
 
   // The lattice, drawn in device pixels so rules stay hairline-crisp at any
