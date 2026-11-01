@@ -14,8 +14,14 @@ function harness() {
     still: { src: '/assets/still.png' },
   }
   const handlers = new Map()
+  const overlay = document.createElement('canvas')
+  container.append(overlay)
   const editor = {
     container,
+    overlay,
+    shapesSorted: () => records,
+    viewSize: () => ({ w: 400, h: 300 }),
+    renderScene: vi.fn(),
     camera: { z: 2 },
     pageToScreen: (x, y) => ({ x: x * 2, y: y * 2 }),
     store: {
