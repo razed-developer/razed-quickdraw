@@ -44,10 +44,11 @@ describe('Reorder context submenu', () => {
     open()
     const item = label => [...container.querySelectorAll('.qd-context-menu [role="menuitem"]')]
       .find(el => el.textContent.startsWith(label))
-    expect(item('Cut')).toBeTruthy()
-    expect(item('Copy')).toBeTruthy()
-    expect(item('Paste')).toBeTruthy()
-    item('Copy').click()
+    expect(item('Edit')).toBeTruthy()
+    item('Edit').click()
+    const commands = [...container.querySelectorAll('.qd-context-submenu button')]
+    expect(commands.map(el => el.textContent)).toEqual(['Cut', 'Copy', 'Paste', 'Duplicate', 'Delete'])
+    commands[1].click()
     expect(editor.copySelection).toHaveBeenCalledOnce()
     editor.hitTest = () => null
     editor.setSelection = ids => { editor.selection = new Set(ids) }
