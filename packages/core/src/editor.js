@@ -1257,7 +1257,7 @@ export class Editor {
 
   // ---- keyboard ------------------------------------------------------------
   _keyDown(e) {
-    if (this.readonly || this.editing) return
+    if (this.readonly || this.editing || e.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return
     const meta = e.metaKey || e.ctrlKey
     const k = e.key.toLowerCase()
     if (k === ' ') {
@@ -1329,6 +1329,7 @@ export class Editor {
     }
   }
   _keyUp(e) {
+    if (e.target?.closest?.('input, textarea, select, [contenteditable="true"]')) return
     if (e.key === ' ') { this.spaceHeld = false; this._syncCursor() }
   }
   _zoomCenter(mult) {
@@ -1449,14 +1450,17 @@ export class Editor {
         const cx = at ? at.x : vp.x + vp.w / 2
         const cy = at ? at.y : vp.y + vp.h / 2
         const assetId = newId('asset')
+        const shapeId = newId()
         this.store.transact(() => {
           this.store.put({ id: assetId, typeName: 'asset', src, w, h })
           this.store.put({
-            id: newId(), typeName: 'shape', type: 'image',
+            id: shapeId, typeName: 'shape', type: 'image',
             x: cx - pw / 2, y: cy - ph / 2, rot: 0, z: this.store.maxZ() + 1,
             props: { w: pw, h: ph, assetId },
           })
         })
+        this.setTool('select')
+        this.setSelection([shapeId])
         if (at) { at = { x: at.x + 24, y: at.y + 24 } }
       } catch (e2) { console.warn('image import failed', e2) }
     }
