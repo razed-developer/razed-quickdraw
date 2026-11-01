@@ -5,37 +5,62 @@
 *{box-sizing:border-box}body{margin:0;font:14px system-ui;background:#e8efef;color:#173338}
 header{padding:14px 18px;background:#173338;color:white}h1{font-size:20px;margin:0}p{margin:5px 0}
 main{display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;padding:12px;height:calc(100vh - 75px)}
-aside{background:white;border:1px solid #a9c0bf;padding:14px;overflow:auto}aside label{display:block;margin:12px 0}aside button{padding:8px;cursor:pointer}
+aside{background:white;border:1px solid #a9c0bf;padding:14px;overflow:auto}aside label{display:block;margin:12px 0}aside button{padding:8px;cursor:pointer}fieldset{border:1px solid #c5d4d4;margin:12px 0;padding:8px 10px}legend{font-weight:700}select{max-width:100%;padding:5px}button{background:#173338;color:#fff;border:0}button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid #237b91;outline-offset:2px}pre{white-space:pre-wrap;overflow-wrap:anywhere;background:#eef3f3;padding:10px}#feedback{min-height:1.4em}
 #board{position:relative;background:white;border:1px solid #a9c0bf;min-height:400px}
 small{color:#526b70}code{overflow-wrap:anywhere}
 @media(max-width:700px){main{grid-template-columns:1fr;height:auto}#board{height:65vh}}
 </style></head><body>
 <header><h1>Razed Quickdraw · Feature Lab</h1><p>Experiment with local SDK options. This page is not a collaborative room.</p></header>
 <main><aside>
-<strong>Participant configuration</strong>
+<fieldset><legend>Participant</legend>
 <label>Role <select id="role"><option value="tutor">Tutor</option><option value="student">Student</option></select></label>
-<label><input type="checkbox" id="health" checked> Enable Board Health for tutors</label>
+<label><input type="checkbox" id="health" checked> Enable Board Health for tutors</label></fieldset><fieldset><legend>Appearance</legend>
 <label>Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
-<label>Grid <select id="grid"><option value="dots">Dots</option><option value="lines">Lines</option><option value="none">None</option></select></label>
-<button id="apply">Apply configuration</button>
-<p><small>Applying options recreates the editor while retaining its document snapshot. Tutor-only visibility here is a UI demonstration, not authorization.</small></p>
-<strong>Current configuration</strong><pre id="config"></pre>
+<label>Grid <select id="grid"><option value="dots">Dots</option><option value="lines">Lines</option><option value="none">None</option></select></label></fieldset><fieldset><legend>Editor controls</legend><label><input type="checkbox" id="readonly"> Read-only mode</label><label><input type="checkbox" id="hideUi"> Hide toolbar</label><label><input type="checkbox" id="themeToggle" checked> Allow theme toggle</label><label><input type="checkbox" id="gridControl" checked> Allow grid control</label></fieldset>
+<button id="apply">Apply configuration</button> <button id="copy" type="button">Copy integration code</button><p id="feedback" role="status" aria-live="polite"></p>
+<p><small>Changing options updates the editor automatically while retaining the document. Tutor-only visibility here is a UI demonstration, not authorization.</small></p>
+<strong>Integration example</strong><pre id="config"></pre>
 <a href="/demo">Open collaboration lab</a>
 </aside><div id="board"></div></main>
 <script type="module">
 import { createQuickdraw, Store } from '/core/index.js'
 const $ = id => document.getElementById(id)
 let board
-let store = new Store()
+const store = new Store()
+let snippet = ''
 function apply() {
   if (board) board.destroy()
   $('board').replaceChildren()
   const role = $('role').value
   const boardHealth = role === 'tutor' && $('health').checked
-  const options = { container: $('board'), store, theme: $('theme').value, grid: $('grid').value, boardHealth, watermark: false }
+  const options = {
+    container: $('board'), store,
+    theme: $('theme').value, grid: $('grid').value,
+    boardHealth, readonly: $('readonly').checked,
+    hideUi: $('hideUi').checked,
+    themeToggle: $('themeToggle').checked,
+    gridControl: $('gridControl').checked,
+    watermark: false,
+  }
   board = createQuickdraw(options)
-  $('config').textContent = JSON.stringify({ role, boardHealth, theme: options.theme, grid: options.grid }, null, 2)
+  const publicOptions = Object.fromEntries(Object.entries(options).filter(([key]) => !['container','store'].includes(key)))
+  snippet = "import { createQuickdraw } from '@quickdrawjs/core'\n\n" +
+    "const board = createQuickdraw({\n  container: document.getElementById('board'),\n" +
+    "  // Supply the authenticated user's permissions from your host app.\n" +
+    "  boardHealth: session.permissions.canViewBoardHealth === true,\n" +
+    Object.entries(publicOptions).filter(([key]) => key !== 'boardHealth')
+      .map(([key,value]) => '  ' + key + ': ' + JSON.stringify(value) + ',\n').join('') +
+    "})"
+  $('config').textContent = snippet
+  $('feedback').textContent = role === 'student' ? 'Student preview: tutor-only controls are hidden.' : 'Tutor preview.'
+}
+for (const id of ['role','health','theme','grid','readonly','hideUi','themeToggle','gridControl']) {
+  $(id).addEventListener('change', apply)
 }
 $('apply').addEventListener('click', apply)
+$('copy').addEventListener('click', async () => {
+  try { await navigator.clipboard.writeText(snippet); $('feedback').textContent = 'Integration example copied.' }
+  catch { $('feedback').textContent = 'Clipboard unavailable. Select the example text to copy.' }
+})
 apply()
 </script></body></html>
