@@ -1766,6 +1766,7 @@ export class Editor {
     this._renderOverlay(w, h, dpr)
     this._renderCapture()
     if (this.editing) this._layoutTextEditor()
+    this.emit('render')
   }
 
   _renderOverlay(w, h, dpr) {
