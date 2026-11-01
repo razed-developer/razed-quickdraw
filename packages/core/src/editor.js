@@ -395,6 +395,25 @@ export class Editor {
     }
     return b
   }
+  alignSelection(mode) {
+    if (this.readonly || this.selection.size < 2) return
+    if (!['left', 'center', 'right', 'top', 'middle', 'bottom'].includes(mode)) return
+    const shapes = [...this.selection].map(id => this.store.get(id)).filter(Boolean)
+    if (shapes.length < 2) return
+    const bounds = shapes.map(shape => ({ shape, bounds: pageBounds(shape) }))
+    const left = Math.min(...bounds.map(item => item.bounds.x))
+    const right = Math.max(...bounds.map(item => item.bounds.x + item.bounds.w))
+    const top = Math.min(...bounds.map(item => item.bounds.y))
+    const bottom = Math.max(...bounds.map(item => item.bounds.y + item.bounds.h))
+    this.store.transact(() => {
+      for (const { shape, bounds: box } of bounds) {
+        const x = mode === 'left' ? left : mode === 'center' ? (left + right - box.w) / 2 : mode === 'right' ? right - box.w : box.x
+        const y = mode === 'top' ? top : mode === 'middle' ? (top + bottom - box.h) / 2 : mode === 'bottom' ? bottom - box.h : box.y
+        const dx = x - box.x, dy = y - box.y
+        if (dx || dy) this.store.update(shape.id, { x: shape.x + dx, y: shape.y + dy })
+      }
+    })
+  }
   deleteSelection() {
     if (!this.selection.size) return
     this.store.remove([...this.selection])
