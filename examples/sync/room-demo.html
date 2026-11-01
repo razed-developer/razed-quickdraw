@@ -184,6 +184,7 @@ function start() {
   for(const board of boards.splice(0)) board.destroy?.()
   const room = document.getElementById('room').value.trim()
   if(!/^[a-zA-Z0-9_-]{1,64}$/.test(room)) { alert('Use 1–64 letters, digits, _ or -'); return }
+  const participantRoles = { a: 'tutor', b: 'student' } // Demo roles; production hosts derive these from authenticated session permissions.
   for(const name of ['a','b']) {
     document.getElementById(`board-${name}`).replaceChildren()
     // Editor colour is a personal preference, not shared room document data.
@@ -209,7 +210,7 @@ function start() {
     }
     const board = createQuickdraw({ container: boardElement, theme:'light', grid:'dots', watermark:false,
       camera:initialCamera,
-      boardHealth:true,
+      boardHealth:participantRoles[name] === 'tutor',
       assetStorage: {
         async upload(blob) {
           const response = await fetch('/api/assets', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob })
