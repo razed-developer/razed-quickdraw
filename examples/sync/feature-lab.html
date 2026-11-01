@@ -17,6 +17,11 @@ small{color:#526b70}code{overflow-wrap:anywhere}
 <label><input type="checkbox" id="health" checked> Enable Board Health for tutors</label></fieldset><fieldset><legend>Appearance</legend>
 <label>Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
 <label>Grid <select id="grid"><option value="dots">Dots</option><option value="lines">Lines</option><option value="none">None</option></select></label></fieldset><fieldset><legend>Editor controls</legend><label><input type="checkbox" id="readonly"> Read-only mode</label><label><input type="checkbox" id="hideUi"> Hide toolbar</label><label><input type="checkbox" id="themeToggle" checked> Allow theme toggle</label><label><input type="checkbox" id="gridControl" checked> Allow grid control</label></fieldset>
+<fieldset><legend>Animated media</legend>
+<label><input type="checkbox" id="animatedGifs" checked> Animate GIF images</label>
+<label><input type="checkbox" id="gifPlaying" checked> Play animations locally</label>
+<small>GIF playback is local to this participant.</small>
+</fieldset>
 <button id="copy" type="button">Copy integration code</button><p id="feedback" role="status" aria-live="polite"></p>
 <p><small>Changing options updates the editor automatically while retaining the document. Tutor-only visibility here is a UI demonstration, not authorization.</small></p>
 <strong>Integration example</strong><pre id="config"></pre>
@@ -40,9 +45,11 @@ function apply() {
     hideUi: $('hideUi').checked,
     themeToggle: $('themeToggle').checked,
     gridControl: $('gridControl').checked,
-    animatedGifs: $('animatedGifs').checked,\n    watermark: false,
+    animatedGifs: $('animatedGifs').checked,
+    watermark: false,
   }
-  board = createQuickdraw(options)\n  board.gifs.setPlaying($('gifPlaying').checked)
+  board = createQuickdraw(options)
+  board.gifs.setPlaying($('gifPlaying').checked)
   const publicOptions = Object.fromEntries(Object.entries(options).filter(([key]) => !['container','store'].includes(key)))
   snippet = "import { createQuickdraw } from '@quickdrawjs/core'\n\n" +
     "const board = createQuickdraw({\n  container: document.getElementById('board'),\n" +
