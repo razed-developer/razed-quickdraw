@@ -1391,7 +1391,7 @@ export class Editor {
           const t = it.types.find((t2) => t2.startsWith('image/'))
           if (t) {
             const blob = await it.getType(t)
-            this.importImageBlobs([blob])
+            await this.importImageBlobs([blob])
             return
           }
         }
@@ -1428,7 +1428,7 @@ export class Editor {
   _paste(e) {
     if (this.readonly || this.editing) return
     const files = [...(e.clipboardData?.files || [])].filter((f) => f.type.startsWith('image/'))
-    if (files.length) { e.preventDefault(); this.importImageBlobs(files) }
+    if (files.length) { e.preventDefault(); void this.importImageBlobs(files).catch(() => {}) }
   }
   _drop(e) {
     if (this.readonly) return
@@ -1437,7 +1437,7 @@ export class Editor {
     e.preventDefault()
     e.stopPropagation()
     const s = this._evPoint(e)
-    this.importImageBlobs(files, this.screenToPage(s.x, s.y))
+    void this.importImageBlobs(files, this.screenToPage(s.x, s.y)).catch(() => {})
   }
   async importImageBlobs(blobs, at) {
     for (const blob of blobs) {
@@ -1501,7 +1501,7 @@ export class Editor {
     input.type = 'file'
     input.accept = 'image/*'
     input.multiple = true
-    input.onchange = () => { if (input.files?.length) this.importImageBlobs([...input.files]) }
+    input.onchange = () => { if (input.files?.length) void this.importImageBlobs([...input.files]).catch(() => {}) }
     input.click()
   }
 
