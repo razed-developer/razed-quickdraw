@@ -5,6 +5,7 @@
 export { Editor, TOOLS } from './editor.js'
 export { measureBoardHealth, mountBoardHealth } from './board-health.js'
 export { mountGifOverlay } from './gif-overlay.js'
+export { mountContextMenu } from './context-menu.js'
 export { isAnimatedImage, planMediaLayers } from './media-layer-plan.js'
 export { wikimediaCommonsProvider, createPixabayProvider } from './media-providers.js'
 export { REGION_LAYOUTS, BACKGROUND_TYPES, regionAt, regionRectangles, validateRegionBackground, createRegionLayout } from './regions.js'
@@ -22,6 +23,7 @@ import { Editor } from './editor.js'
 import { buildUI } from './ui.js'
 import { mountBoardHealth } from './board-health.js'
 import { mountGifOverlay } from './gif-overlay.js'
+import { mountContextMenu } from './context-menu.js'
 
 // The "made with Quickdraw" mark in the board's corner. It stays up when the
 // toolbar is hidden — hosts building their own chrome still credit the
@@ -59,11 +61,14 @@ export function createQuickdraw(opts) {
   const watermark = opts.watermark === false ? null : buildWatermark(editor)
   const health = mountBoardHealth(editor, { enabled: opts.boardHealth === true })
   const gifs = mountGifOverlay(editor, { enabled: opts.animatedGifs === true })
+  const contextMenu = mountContextMenu(editor, { enabled: opts.contextMenu !== false })
   return {
     editor,
     ui,
     gifs,
+    contextMenu,
     destroy() {
+      contextMenu.destroy()
       gifs.destroy()
       health.destroy()
       watermark?.remove()
