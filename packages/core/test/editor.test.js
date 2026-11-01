@@ -697,3 +697,24 @@ describe('clipboard stacking', () => {
     expect(pasted.z).toBeGreaterThan(editor.store.get('existing-a').z)
   })
 })
+
+describe('Arrange alignment', () => {
+  it('aligns visual left edges in one undoable transaction', () => {
+    const a = { id: 'align-a', typeName: 'shape', type: 'geo', x: 10, y: 20, z: 1, rot: 0, props: { w: 30, h: 30 } }
+    const b = { ...a, id: 'align-b', x: 90, y: 60, z: 2 }
+    editor.store.put(a)
+    editor.store.put(b)
+    editor.setSelection([a.id, b.id])
+    editor.alignSelection('left')
+    expect(editor.store.get(b.id).x).toBe(10)
+    editor.store.undo()
+    expect(editor.store.get(b.id).x).toBe(90)
+  })
+  it('does not align a single selected shape', () => {
+    const a = { id: 'align-single', typeName: 'shape', type: 'geo', x: 10, y: 20, z: 1, rot: 0, props: { w: 30, h: 30 } }
+    editor.store.put(a)
+    editor.setSelection([a.id])
+    editor.alignSelection('center')
+    expect(editor.store.get(a.id).x).toBe(10)
+  })
+})
