@@ -33,9 +33,10 @@ const bendMidpoint = (pr) => {
 }
 
 export class Editor {
-  constructor({ container, store, theme = 'light', grid = 'lines', readonly = false, camera, styles, geoKind, regions = null, features } = {}) {
+  constructor({ container, store, theme = 'light', grid = 'lines', readonly = false, camera, styles, geoKind, regions = null, features, assetStorage = null } = {}) {
     this.container = container
     this.store = store || new Store()
+    this.assetStorage = assetStorage
     this.theme = themeOf(theme)
     // Omitted features preserve the legacy grid. Explicit feature settings
     // allow hosts to opt into a plain canvas or infinite regions.
@@ -1441,7 +1442,16 @@ export class Editor {
   async importImageBlobs(blobs, at) {
     for (const blob of blobs) {
       try {
-        const { src, w, h } = await readImage(blob)
+        const decoded = await readImage(blob)
+        const { w, h } = decoded
+        let src = decoded.src
+        if (this.assetStorage) {
+          if (typeof this.assetStorage.upload !== 'function') throw new TypeError('assetStorage.upload must be a function')
+          const normalized = await (await fetch(src)).blob()
+          const uploaded = await this.assetStorage.upload(normalized, { mimeType: normalized.type })
+          if (!uploaded || typeof uploaded.url !== 'string' || !uploaded.url.trim()) throw new Error('Asset upload returned no URL')
+          src = uploaded.url
+        }
         const vp = this.viewportPageBounds()
         // land at a comfortable size: at most ~60% of the view
         const scale = Math.min(1, (vp.w * 0.6) / w, (vp.h * 0.6) / h)
