@@ -26,4 +26,36 @@ describe('Reorder context submenu', () => {
     context.destroy()
     container.remove()
   })
+  it('exposes clipboard commands for selected objects and Paste on blank canvas', () => {
+    const container = document.createElement('div')
+    document.body.append(container)
+    const editor = {
+      container, selection: new Set(['a']), readonly: false,
+      screenToPage: (x, y) => ({ x, y }),
+      hitTest: () => ({ id: 'a' }),
+      copySelection: vi.fn(), cutSelection: vi.fn(), pasteFromClipboard: vi.fn(),
+      duplicateSelection: vi.fn(), deleteSelection: vi.fn(), selectAll: vi.fn(),
+      bringToFront: vi.fn(), bringForward: vi.fn(), sendBackward: vi.fn(), sendToBack: vi.fn(),
+    }
+    const context = mountContextMenu(editor)
+    const open = () => container.dispatchEvent(new MouseEvent('contextmenu', {
+      bubbles: true, cancelable: true, clientX: 10, clientY: 10,
+    }))
+    open()
+    const item = label => [...container.querySelectorAll('.qd-context-menu [role="menuitem"]')]
+      .find(el => el.textContent.startsWith(label))
+    expect(item('Cut')).toBeTruthy()
+    expect(item('Copy')).toBeTruthy()
+    expect(item('Paste')).toBeTruthy()
+    item('Copy').click()
+    expect(editor.copySelection).toHaveBeenCalledOnce()
+    editor.hitTest = () => null
+    editor.setSelection = ids => { editor.selection = new Set(ids) }
+    open()
+    expect(item('Paste')).toBeTruthy()
+    expect(item('Cut')).toBeFalsy()
+    context.destroy()
+    container.remove()
+  })
+
 })
