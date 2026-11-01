@@ -2,18 +2,24 @@
 // The SDK itself has no network dependency. This example deliberately rejects
 // stale revisions rather than silently overwriting concurrent edits.
 import { createServer } from 'node:http'
+import { randomUUID } from 'node:crypto'
 import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
-import { stat } from 'node:fs/promises'
+import { stat, writeFile, unlink } from 'node:fs/promises'
 import { dirname, resolve, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocket, WebSocketServer } from 'ws'
 import { Store } from '../../packages/core/src/store.js'
 
 const MAX_MESSAGE_BYTES = 24 * 1024 * 1024
+const MAX_ASSET_BYTES = 20 * 1024 * 1024
+const ASSET_ID_PATTERN = /^[a-f0-9-]{36}$/
+const MIME_EXT = { 'image/png': '.png', 'image/jpeg': '.jpg', 'image/webp': '.webp', 'image/gif': '.gif' }
 const ROOM_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/
 
 export function createRoomSyncServer({ dataDir = resolve(dirname(fileURLToPath(import.meta.url)), '.room-data') } = {}) {
   mkdirSync(dataDir, { recursive: true })
+  const assetDir = join(dataDir, 'assets')
+  mkdirSync(assetDir, { recursive: true })
   const directory = dirname(fileURLToPath(import.meta.url))
   const root = resolve(directory, '../..')
   const assets = new Map([
@@ -26,8 +32,43 @@ export function createRoomSyncServer({ dataDir = resolve(dirname(fileURLToPath(i
   // The browser SDK imports other core modules. Only serve the explicit core
   // directory and demo assets; do not expose arbitrary repository files.
   const http = createServer(async (req, res) => {
-    if (req.method !== 'GET') { res.writeHead(405).end(); return }
     const pathname = new URL(req.url, 'http://localhost').pathname
+    if (pathname === '/api/assets' && req.method === 'POST') {
+      const mime = String(req.headers['content-type'] || '').split(';')[0].toLowerCase()
+      const ext = MIME_EXT[mime]
+      const length = Number(req.headers['content-length'])
+      if (!ext || (req.headers['content-length'] && (!Number.isSafeInteger(length) || length > MAX_ASSET_BYTES))) {
+        res.writeHead(413).end('Unsupported image type or size'); return
+      }
+      const chunks = []
+      let size = 0
+      try {
+        for await (const chunk of req) {
+          size += chunk.length
+          if (size > MAX_ASSET_BYTES) { res.writeHead(413).end('Image too large'); return }
+          chunks.push(chunk)
+        }
+        if (!size) { res.writeHead(400).end('Empty image'); return }
+        const id = randomUUID()
+        await writeFile(join(assetDir, id + ext), Buffer.concat(chunks), { flag: 'wx' })
+        res.writeHead(201, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' })
+        res.end(JSON.stringify({ url: '/api/assets/' + id + ext }))
+      } catch (error) {
+        if (!res.headersSent) res.writeHead(500).end('Upload failed')
+      }
+      return
+    }
+    const assetMatch = /^\/api\/assets\/([a-f0-9-]{36})(\.(?:png|jpg|webp|gif))$/.exec(pathname)
+    if (assetMatch && req.method === 'GET' && ASSET_ID_PATTERN.test(assetMatch[1])) {
+      const file = join(assetDir, assetMatch[1] + assetMatch[2])
+      try {
+        const info = await stat(file)
+        res.writeHead(200, { 'Content-Type': Object.keys(MIME_EXT).find(k => MIME_EXT[k] === assetMatch[2]), 'Content-Length': info.size, 'Cache-Control': 'public, max-age=3600' })
+        createReadStream(file).pipe(res)
+      } catch { res.writeHead(404).end() }
+      return
+    }
+    if (req.method !== 'GET') { res.writeHead(405).end(); return }
     let asset = assets.get(pathname)
     if (!asset && /^\/core\/[a-zA-Z0-9_-]+\.js$/.test(pathname)) {
       asset = [resolve(root, 'packages/core/src', pathname.slice('/core/'.length)), 'text/javascript; charset=utf-8']
