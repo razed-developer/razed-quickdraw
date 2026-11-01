@@ -3,7 +3,7 @@
 // plain web page: every module is dependency-free ESM.
 
 export { Editor, TOOLS } from './editor.js'
-export { wikimediaCommonsProvider } from './media-providers.js'
+export { wikimediaCommonsProvider, createPixabayProvider } from './media-providers.js'
 export { REGION_LAYOUTS, BACKGROUND_TYPES, regionAt, regionRectangles, validateRegionBackground, createRegionLayout } from './regions.js'
 export { Store, newId, isDiffEmpty, invertDiff, composeDiff } from './store.js'
 export { buildUI } from './ui.js'
