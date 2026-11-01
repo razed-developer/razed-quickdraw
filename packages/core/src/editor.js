@@ -1565,7 +1565,7 @@ export class Editor {
 
   // content-only pass (paper + shapes), reused by the screen, the capture
   // canvas and image export
-  renderScene(ctx, cam, w, h, { dpr = 1, background = true, hideEditing = false } = {}) {
+  renderScene(ctx, cam, w, h, { dpr = 1, background = true, hideEditing = false, shapes = null } = {}) {
     ctx.setTransform(1, 0, 0, 1, 0, 0)
     if (background) {
       ctx.fillStyle = this.theme.background
@@ -1581,7 +1581,7 @@ export class Editor {
     const vp = { x: -cam.x, y: -cam.y, w: w / cam.z, h: h / cam.z }
     const pad = 64 / cam.z
     const vis = boundsExpand(vp, pad)
-    for (const s of this.shapesSorted()) {
+    for (const s of shapes || this.shapesSorted()) {
       const pb = pageBounds(s)
       if (pb.x + pb.w < vis.x || pb.x > vis.x + vis.w || pb.y + pb.h < vis.y || pb.y > vis.y + vis.h) continue
       drawShape(ctx, s, {
@@ -1762,7 +1762,7 @@ export class Editor {
       }
     }
     const ctx = this.canvas.getContext('2d')
-    this.renderScene(ctx, this.camera, w, h, { dpr, hideEditing: true })
+    this.renderScene(ctx, this.camera, w, h, { dpr, hideEditing: true, shapes: this._mediaCompositorActive ? [] : null })
     this._renderOverlay(w, h, dpr)
     this._renderCapture()
     if (this.editing) this._layoutTextEditor()
