@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { Store } from './store.js'
-import { measureBoardHealth } from './board-health.js'
+import { Store } from '../src/store.js'
+import { measureBoardHealth } from '../src/board-health.js'
 
 const makeStore = (shapes = [], assets = []) => {
   const store = new Store()
