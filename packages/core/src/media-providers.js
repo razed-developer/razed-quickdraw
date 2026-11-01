@@ -38,3 +38,39 @@ export const wikimediaCommonsProvider = {
     return blob
   }
 }
+
+// Pixabay's API key must be held by the host backend, never in browser code.
+// Supply a same-origin endpoint that accepts ?q= and returns Pixabay's JSON response.
+export function createPixabayProvider({ searchEndpoint }) {
+  if (typeof searchEndpoint !== 'string' || !searchEndpoint.startsWith('/') || searchEndpoint.startsWith('//')) {
+    throw new TypeError('Pixabay searchEndpoint must be a same-origin path')
+  }
+  return {
+    id: 'pixabay',
+    label: 'Pixabay',
+    async search(query, { limit = 16, signal } = {}) {
+      if (!String(query || '').trim()) return []
+      const url = new URL(searchEndpoint, window.location.origin)
+      url.searchParams.set('q', query.trim())
+      url.searchParams.set('per_page', String(Math.max(3, Math.min(30, limit))))
+      const response = await fetch(url, { signal })
+      if (!response.ok) throw new Error('Pixabay search failed (' + response.status + ')')
+      const json = await response.json()
+      if (!Array.isArray(json.hits)) throw new Error('Invalid Pixabay response')
+      return json.hits.filter(hit => hit.webformatURL && hit.previewURL).map(hit => ({
+        id: String(hit.id), title: hit.tags || 'Pixabay image',
+        thumbnailUrl: hit.previewURL, imageUrl: hit.webformatURL,
+        source: { provider: 'pixabay', title: hit.tags || 'Pixabay image',
+          author: hit.user || '', license: 'Pixabay Content License',
+          sourceUrl: hit.pageURL || '' }
+      }))
+    },
+    async getBlob(item, { signal } = {}) {
+      const response = await fetch(item.imageUrl, { signal })
+      if (!response.ok) throw new Error('Pixabay image download failed (' + response.status + ')')
+      const blob = await response.blob()
+      if (!blob.type.startsWith('image/')) throw new TypeError('Remote response was not an image')
+      return blob
+    }
+  }
+}
