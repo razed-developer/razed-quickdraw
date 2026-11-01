@@ -274,19 +274,6 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     picker.addEventListener('input',e=>{e.stopPropagation();applyColor(picker.value)})
     customRow.append(picker)
     paletteLeft.append(customRow)
-    if (typeof window.EyeDropper === 'function') {
-      const eyedrop = el('button','qd-opt')
-      eyedrop.innerHTML = SVG('<path d="m2 22 6-6 4 4-6 6H2v-4Z"/><path d="m9 15 7.9-7.9a3 3 0 0 0-4.2-4.2L4.8 10.8"/><path d="m8 8 8 8"/><path d="m14 5 5 5"/>')
-      eyedrop.classList.add('qd-eyedropper')
-      eyedrop.title = 'Pick colour from screen'
-      eyedrop.setAttribute('aria-label','Pick colour from screen')
-      eyedrop.addEventListener('click',async e=>{
-        e.stopPropagation()
-        try { const result=await new window.EyeDropper().open(); applyColor(result.sRGBHex) }
-        catch { /* user cancelled or browser denied permission */ }
-      })
-      customRow.append(eyedrop)
-    }
     // Personal palette state. V2 migrates previous collections into a permanent holding tray.
     const owner=editor.container.dataset.qdSwatchOwner||'default'
     const key='quickdraw:palette:v2:'+owner
