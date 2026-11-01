@@ -48,7 +48,7 @@ button{cursor:pointer;padding:7px 10px}
 <option value="left-focus">Left focus</option><option value="right-focus">Right focus</option>
 </select></label>
 <div id="region-options"></div>
-<small>Preview only · applies to both boards · not synchronized to the room</small>
+<small>Shared room settings · saved with the drawing</small>
 </div>
 <main>
 <section><h2>Participant A · <span class="status" id="status-a">connecting</span></h2><div id="board-a" class="board"></div><button id="follow-a">Follow B: Off</button><button id="call-a">Call B here</button><p id="invite-a"></p></section>
@@ -69,6 +69,9 @@ let activeRecovery = null
 const REGION_COUNTS={vertical:2,horizontal:2,quadrants:4,'top-split':3,'bottom-split':3,'left-focus':3,'right-focus':3}
 const REGION_TYPES=['solid','graph','dots','paper','dark','custom']
 const regionSettings={layout:'quadrants',backgrounds:[]}
+const SETTINGS_ID='quickdraw:board-settings:regions'
+let loadingRegionSettings=false
+let roomReady=false
 const regionOptions=document.getElementById('region-options')
 const regionsEnabled=document.getElementById('regions-enabled')
 const layoutSelect=document.getElementById('region-layout')
@@ -76,12 +79,27 @@ function regionBackgrounds(){
   const count=REGION_COUNTS[regionSettings.layout]
   return Array.from({length:count},(_,i)=>regionSettings.backgrounds[i]||{type:'solid'})
 }
-function applyRegionPreview(){
+function applyRegionPreview(save=true){
   const enabled=regionsEnabled.checked
   for(const board of boards){
     board.editor.setRegions(regionSettings.layout,regionBackgrounds())
     board.editor.setFeatures({regions:enabled})
   }
+  if(save && roomReady && !loadingRegionSettings && boards[0]){
+    boards[0].editor.store.put({id:SETTINGS_ID,typeName:'board-settings',enabled,layout:regionSettings.layout,backgrounds:regionBackgrounds()})
+  }
+}
+function loadRegionSettings(){
+  const rec=boards[0]?.editor.store.get(SETTINGS_ID)
+  loadingRegionSettings=true
+  try {
+    regionsEnabled.checked=rec?.typeName==='board-settings' && rec.enabled===true
+    regionSettings.layout=rec && REGION_COUNTS[rec.layout]?rec.layout:'quadrants'
+    regionSettings.backgrounds=Array.isArray(rec?.backgrounds)?rec.backgrounds.map(b=>({...b})):[]
+    layoutSelect.value=regionSettings.layout
+    rebuildRegionControls()
+    applyRegionPreview(false)
+  } finally { loadingRegionSettings=false }
 }
 function rebuildRegionControls(){
   regionOptions.replaceChildren()
@@ -158,6 +176,7 @@ document.getElementById('keep-local').onclick=()=>{
 const url = `${location.protocol === 'https:' ? 'wss:' : 'ws:'}//${location.host}`
 function start() {
   hideRecovery()
+  roomReady=false
   for(const cleanup of cameraCleanups.splice(0)) cleanup()
   follow.a=false;follow.b=false
   cameras.a=cameras.b=null
@@ -181,6 +200,9 @@ function start() {
     }
     cameraCleanups.push(board.editor.on('styles', saveColour))
     boards.push(board)
+    cameraCleanups.push(board.editor.store.listen(diff=>{
+      if(diff.added?.[SETTINGS_ID] || diff.updated?.[SETTINGS_ID] || diff.removed?.[SETTINGS_ID]) loadRegionSettings()
+    }))
     board.editor.setRegions(regionSettings.layout,regionBackgrounds())
     board.editor.setFeatures({regions:regionsEnabled.checked})
     const layer=document.createElement('div')
@@ -258,7 +280,11 @@ function start() {
         target.append(label,go,dismiss)
       },
       store: board.editor.store, url, room,
-      onStatus: status => { document.getElementById(`status-${name}`).textContent = status },
+      onStatus: status => {
+        document.getElementById(`status-${name}`).textContent = status
+        if(name==='a' && status==='connected') {roomReady=true;loadRegionSettings()}
+        if(name==='a' && status!=='connected') roomReady=false
+      },
       onConflict: ({snapshot,revision,pending}) => {
         const notice = document.getElementById('notice')
         notice.textContent = `Participant ${name.toUpperCase()} has ${pending.length} pending changes. Server revision ${revision}. Resolve before continuing.`
