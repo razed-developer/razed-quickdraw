@@ -5,6 +5,7 @@
 export { Editor, TOOLS } from './editor.js'
 export { measureBoardHealth, mountBoardHealth } from './board-health.js'
 export { mountGifOverlay } from './gif-overlay.js'
+export { isAnimatedImage, planMediaLayers } from './media-layer-plan.js'
 export { wikimediaCommonsProvider, createPixabayProvider } from './media-providers.js'
 export { REGION_LAYOUTS, BACKGROUND_TYPES, regionAt, regionRectangles, validateRegionBackground, createRegionLayout } from './regions.js'
 export { Store, newId, isDiffEmpty, invertDiff, composeDiff } from './store.js'
