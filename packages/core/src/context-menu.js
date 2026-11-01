@@ -104,6 +104,16 @@ export function mountContextMenu(editor, { enabled = true } = {}) {
     const hasSelection = editor.selection.size > 0
     if (hasSelection) {
       if (!editor.readonly) {
+        if (editor.selection.size >= 2) {
+          addSubmenu('Arrange', [
+            ['Align left', () => editor.alignSelection('left')],
+            ['Align center', () => editor.alignSelection('center')],
+            ['Align right', () => editor.alignSelection('right')],
+            ['Align top', () => editor.alignSelection('top')],
+            ['Align middle', () => editor.alignSelection('middle')],
+            ['Align bottom', () => editor.alignSelection('bottom')],
+          ])
+        }
         addSubmenu('Reorder', [
           ['Bring to front', () => editor.bringToFront()],
           ['Bring forward', () => editor.bringForward()],
