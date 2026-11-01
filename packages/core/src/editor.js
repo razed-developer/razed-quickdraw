@@ -1307,7 +1307,7 @@ export class Editor {
     if (meta && k === 'a') { e.preventDefault(); this.selectAll(); return }
     if (meta && k === 'd') { e.preventDefault(); this.duplicateSelection(); return }
     if (meta && k === 'c') { e.preventDefault(); this.copySelection(); return }
-    if (meta && k === 'x') { e.preventDefault(); this.copySelection().then(() => this.deleteSelection()); return }
+    if (meta && k === 'x') { e.preventDefault(); void this.cutSelection(); return }
     if (meta && k === 'v') { e.preventDefault(); this.pasteFromClipboard(); return }
     if (meta && (k === '=' || k === '+')) { e.preventDefault(); this._zoomCenter(1.25); return }
     if (meta && k === '-') { e.preventDefault(); this._zoomCenter(1 / 1.25); return }
@@ -1403,7 +1403,7 @@ export class Editor {
 
   // ---- clipboard / images --------------------------------------------------
   async copySelection() {
-    if (!this.selection.size) return
+    if (!this.selection.size) return false
     const shapes = []
     const assets = {}
     for (const id of this.selection) {
@@ -1417,7 +1417,17 @@ export class Editor {
     }
     try {
       await navigator.clipboard.writeText(JSON.stringify({ quickdraw: 1, shapes, assets }))
-    } catch (e) { console.warn('board copy failed', e) }
+      return true
+    } catch (e) { console.warn('board copy failed', e); this.emit('clipboard-error', { action: 'copy', error: e }); return false }
+  }
+  async cutSelection() {
+    if (this.readonly || !this.selection.size) return false
+    const ids = [...this.selection]
+    if (!(await this.copySelection())) return false
+    const remaining = ids.filter(id => this.store.has(id))
+    if (remaining.length) this.store.remove(remaining)
+    this.setSelection([])
+    return true
   }
   async pasteFromClipboard() {
     // images first, then our own shape payloads
