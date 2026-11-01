@@ -197,16 +197,28 @@ function geoLabelLayout(shape) {
 
 // ---- image assets ----------------------------------------------------------
 
-const imgCache = new Map() // assetId -> { img, ready }
+const imgCache = new WeakMap() // store -> Map(assetId -> { src, img, ready, listeners })
 export function assetImage(store, assetId, onReady) {
-  let e = imgCache.get(assetId)
-  if (e) return e.ready ? e.img : null
   const asset = store.asset(assetId)
   if (!asset) return null
+  let cache = imgCache.get(store)
+  if (!cache) { cache = new Map(); imgCache.set(store, cache) }
+  let entry = cache.get(assetId)
+  if (entry && entry.src !== asset.src) { cache.delete(assetId); entry = null }
+  if (entry) {
+    if (!entry.ready && typeof onReady === 'function') entry.listeners.add(onReady)
+    return entry.ready ? entry.img : null
+  }
   const img = new Image()
-  e = { img, ready: false }
-  imgCache.set(assetId, e)
-  img.onload = () => { e.ready = true; onReady && onReady() }
+  entry = { src: asset.src, img, ready: false, listeners: new Set() }
+  if (typeof onReady === 'function') entry.listeners.add(onReady)
+  cache.set(assetId, entry)
+  img.onload = () => {
+    entry.ready = true
+    for (const listener of entry.listeners) listener()
+    entry.listeners.clear()
+  }
+  img.onerror = () => { entry.listeners.clear() }
   img.src = asset.src
   return null
 }
