@@ -209,6 +209,13 @@ function start() {
     }
     const board = createQuickdraw({ container: boardElement, theme:'light', grid:'dots', watermark:false,
       camera:initialCamera,
+      assetStorage: {
+        async upload(blob) {
+          const response = await fetch('/api/assets', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob })
+          if (!response.ok) throw new Error('Image upload failed (' + response.status + ')')
+          return response.json()
+        },
+      },
       ...(validColour ? { styles: { color: savedColour } } : {}) })
     cameraCleanups.push(board.editor.on('camera',()=>{
       try {localStorage.setItem(cameraKey,JSON.stringify(board.editor.camera))} catch { /* storage unavailable */ }
