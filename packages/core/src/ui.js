@@ -610,62 +610,108 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
 
     if (opts.gridControl || opts.themeToggle) p.appendChild(el('i', 'qd-menu-div'))
     if (opts.gridControl) {
-      // a standard nested dropdown: the row grows a flyout beside the menu —
-      // six buttons inline read as clutter
-      // a div, not a button: the flyout nests inside, and buttons can't nest
-      const row = el('div', 'qd-menu-item qd-has-sub')
-      row.setAttribute('role', 'button')
-      row.tabIndex = 0
-      row.innerHTML =
-        `<span class="qd-mi-ico">${GRID_ICONS[editor.grid]}</span>` +
-        '<span class="qd-mi-label">Grid</span>' +
-        '<span class="qd-mi-value"></span>' +
-        `<span class="qd-mi-chev">${ICONS.chevronRight}</span>`
-      row.querySelector('.qd-mi-value').textContent = GRID_LABELS[editor.grid]
-
-      const sub = el('div', 'qd-submenu')
-      for (const id of GRID_IDS) {
-        const b = el('button', 'qd-menu-item')
-        b.innerHTML =
-          `<span class="qd-mi-ico">${GRID_ICONS[id]}</span>` +
-          '<span class="qd-mi-label"></span>' +
-          `<span class="qd-mi-check">${editor.grid === id ? ICONS.check : ''}</span>`
-        b.querySelector('.qd-mi-label').textContent = GRID_LABELS[id]
-        b.title = GRID_TIPS[id]
-        b.addEventListener('click', (e) => {
-          e.stopPropagation()
-          editor.setGrid(id)
-          sub.querySelectorAll('.qd-mi-check').forEach((c, i) => { c.innerHTML = GRID_IDS[i] === id ? ICONS.check : '' })
-          row.querySelector('.qd-mi-ico').innerHTML = GRID_ICONS[id]
-          row.querySelector('.qd-mi-value').textContent = GRID_LABELS[id]
+      const SETTINGS_ID='quickdraw:board-settings:regions'
+      const layouts={single:'Single canvas',vertical:'Vertical split',horizontal:'Horizontal split',quadrants:'Four quadrants',
+        'top-split':'Top split','bottom-split':'Bottom split','left-focus':'Left focus','right-focus':'Right focus'}
+      const counts={vertical:2,horizontal:2,quadrants:4,'top-split':3,'bottom-split':3,'left-focus':3,'right-focus':3}
+      const types={solid:'None',graph:'Lines',paper:'Ruled',dots:'Dots',crosses:'Crosses',iso:'Isometric',dark:'Dark',custom:'Custom colour'}
+      const existing=editor.store.get(SETTINGS_ID)
+      const state=existing?.typeName==='board-settings'?existing:{
+        id:SETTINGS_ID,typeName:'board-settings',enabled:editor.features.regions&&!!editor.regions,
+        layout:editor.regions?.layout||'quadrants',backgrounds:editor.regions?.backgrounds||[],
+        grid:editor.grid,boundaries:!!editor.showRegionBoundaries}
+      const save=patch=>{
+        const next={...state,...patch}
+        Object.assign(state,next)
+        editor.store.put({...next,id:SETTINGS_ID,typeName:'board-settings'})
+        apply(next)
+      }
+      const apply=rec=>{
+        if(rec.enabled&&counts[rec.layout]) editor.setRegions(rec.layout,rec.backgrounds||[])
+        editor.setFeatures({regions:!!rec.enabled})
+        if(rec.grid&&GRID_IDS.includes(rec.grid))editor.setGrid(rec.grid)
+        editor.showRegionBoundaries=!!rec.boundaries
+        editor.requestRender()
+      }
+      const menuRow=(parent,label,value,click)=>{
+        const b=el('button','qd-menu-item')
+        b.style.width='100%'
+        b.innerHTML='<span class="qd-mi-label"></span><span class="qd-mi-value"></span>'
+        b.querySelector('.qd-mi-label').textContent=label
+        b.querySelector('.qd-mi-value').textContent=value||''
+        b.addEventListener('click',e=>{e.stopPropagation();click()})
+        parent.appendChild(b);return b
+      }
+      const rootRow=el('div','qd-menu-item qd-has-sub')
+      rootRow.setAttribute('role','button');rootRow.tabIndex=0
+      rootRow.innerHTML='<span class="qd-mi-label">Canvas</span><span class="qd-mi-chev">'+ICONS.chevronRight+'</span>'
+      const sub=el('div','qd-submenu')
+      sub.style.minWidth='220px'
+      const panel=(title,render)=>{
+        sub.replaceChildren()
+        menuRow(sub,'‹ Canvas','',()=>renderRoot())
+        const heading=el('div','qd-menu-row');heading.textContent=title;heading.style.fontWeight='600';sub.appendChild(heading)
+        render()
+      }
+      const renderRoot=()=>{
+        sub.replaceChildren()
+        menuRow(sub,'Layout',state.enabled?layouts[state.layout]:'Single canvas',()=>panel('Layout',()=>{
+          for(const [id,label] of Object.entries(layouts))
+            menuRow(sub,label,(id==='single'?!state.enabled:state.enabled&&state.layout===id)?'✓':'',()=>{
+              if(id==='single')save({enabled:false})
+              else save({enabled:true,layout:id,backgrounds:Array.from({length:counts[id]},(_,i)=>state.backgrounds?.[i]||{type:'solid'})})
+              renderRoot()
+            })
+        }))
+        menuRow(sub,'Backgrounds',state.enabled?'Per region':GRID_LABELS[state.grid||editor.grid],()=>panel('Backgrounds',()=>{
+          if(!state.enabled){
+            for(const id of GRID_IDS)menuRow(sub,GRID_LABELS[id],(state.grid||editor.grid)===id?'✓':'',()=>{
+              save({grid:id});renderRoot()
+            })
+          } else {
+            const backgrounds=Array.from({length:counts[state.layout]},(_,i)=>state.backgrounds?.[i]||{type:'solid'})
+            backgrounds.forEach((bg,i)=>menuRow(sub,'Region '+(i+1),types[bg.type]||bg.type,()=>panel('Region '+(i+1),()=>{
+              for(const [type,label] of Object.entries(types))menuRow(sub,label,bg.type===type?'✓':'',()=>{
+                const next=backgrounds.map(b=>({...b}))
+                next[i]=type==='custom'?{type,color:bg.color||'#d7e8f4'}:{type}
+                save({backgrounds:next});renderRoot()
+              })
+              if(bg.type==='custom'){
+                const input=el('input');input.type='color';input.value=bg.color||'#d7e8f4'
+                input.title='Region colour';input.style.margin='8px'
+                input.addEventListener('input',()=>{
+                  const next=backgrounds.map(b=>({...b}));next[i]={type:'custom',color:input.value}
+                  save({backgrounds:next})
+                });sub.appendChild(input)
+              }
+            })))
+          }
+        }))
+        menuRow(sub,'Show region boundaries',state.boundaries?'On':'Off',()=>{
+          save({boundaries:!state.boundaries});renderRoot()
         })
-        sub.appendChild(b)
+        menuRow(sub,'Reset to default','',()=>{
+          save({enabled:false,grid:'lines',boundaries:false,layout:'quadrants',backgrounds:[]});renderRoot()
+        })
       }
-      row.appendChild(sub)
-
-      const openSub = () => {
-        row.classList.add('sub-open')
-        // side with room wins: nested menus prefer the right, but the board
-        // menu usually hugs the right edge of the frame
-        const rr = root.getBoundingClientRect()
-        const br = row.getBoundingClientRect()
-        const fitsRight = br.right + sub.offsetWidth + 12 <= rr.right
-        sub.classList.toggle('qd-sub-left', !fitsRight)
-        // grow upward when the row sits low in the frame
-        const fitsDown = br.top - 7 + sub.offsetHeight <= rr.bottom - 8
-        sub.style.top = fitsDown ? '' : 'auto'
-        sub.style.bottom = fitsDown ? '' : '-7px'
+      renderRoot()
+      rootRow.appendChild(sub)
+      const open=()=>{
+        rootRow.classList.add('sub-open')
+        const rr=root.getBoundingClientRect(),br=rootRow.getBoundingClientRect()
+        sub.classList.toggle('qd-sub-left',br.right+sub.offsetWidth+12>rr.right)
+        const fitsDown=br.top-7+sub.offsetHeight<=rr.bottom-8
+        sub.style.top=fitsDown?'':'auto';sub.style.bottom=fitsDown?'':'-7px'
       }
-      const closeSub = () => row.classList.remove('sub-open')
-      let subT
-      row.addEventListener('mouseenter', () => { clearTimeout(subT); openSub() })
-      row.addEventListener('mouseleave', () => { subT = setTimeout(closeSub, 180) })
-      // tap toggles, for pointers that don't hover
-      row.addEventListener('click', (e) => {
+      let timer
+      rootRow.addEventListener('mouseenter',()=>{clearTimeout(timer);open()})
+      rootRow.addEventListener('mouseleave',()=>{timer=setTimeout(()=>rootRow.classList.remove('sub-open'),180)})
+      rootRow.addEventListener('click',e=>{
         e.stopPropagation()
-        row.classList.contains('sub-open') ? closeSub() : openSub()
+        if(rootRow.classList.contains('sub-open'))rootRow.classList.remove('sub-open')
+        else open()
       })
-      p.appendChild(row)
+      p.appendChild(rootRow)
     }
     if (opts.themeToggle) {
       segment('Theme', ['light', 'dark'], {
