@@ -112,6 +112,10 @@ export function mountContextMenu(editor, { enabled = true } = {}) {
             ['Align top', () => editor.alignSelection('top')],
             ['Align middle', () => editor.alignSelection('middle')],
             ['Align bottom', () => editor.alignSelection('bottom')],
+            ...(editor.selection.size >= 3 ? [
+              ['Distribute horizontally', () => editor.distributeSelection('horizontal')],
+              ['Distribute vertically', () => editor.distributeSelection('vertical')],
+            ] : []),
           ])
         }
         addSubmenu('Reorder', [
