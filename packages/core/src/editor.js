@@ -1462,7 +1462,7 @@ export class Editor {
         const assetId = newId('asset')
         const shapeId = newId()
         this.store.transact(() => {
-          this.store.put({ id: assetId, typeName: 'asset', src, w, h })
+          this.store.put({ id: assetId, typeName: 'asset', src, w, h, ...(blob.type === 'image/gif' ? { animated: true, mimeType: 'image/gif' } : {}) })
           this.store.put({
             id: shapeId, typeName: 'shape', type: 'image',
             x: cx - pw / 2, y: cy - ph / 2, rot: 0, z: this.store.maxZ() + 1,
@@ -1996,7 +1996,7 @@ async function readImage(blob) {
     let { width: w, height: h } = img
     const MAX = 2048
     const k = Math.min(1, MAX / Math.max(w, h))
-    if (k < 1 || blob.type === 'image/heic') {
+    if ((k < 1 && blob.type !== 'image/gif') || blob.type === 'image/heic') {
       const c = document.createElement('canvas')
       c.width = Math.round(w * k)
       c.height = Math.round(h * k)
