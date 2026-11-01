@@ -40,9 +40,9 @@ function apply() {
     hideUi: $('hideUi').checked,
     themeToggle: $('themeToggle').checked,
     gridControl: $('gridControl').checked,
-    watermark: false,
+    animatedGifs: $('animatedGifs').checked,\n    watermark: false,
   }
-  board = createQuickdraw(options)
+  board = createQuickdraw(options)\n  board.gifs.setPlaying($('gifPlaying').checked)
   const publicOptions = Object.fromEntries(Object.entries(options).filter(([key]) => !['container','store'].includes(key)))
   snippet = "import { createQuickdraw } from '@quickdrawjs/core'\n\n" +
     "const board = createQuickdraw({\n  container: document.getElementById('board'),\n" +
@@ -54,7 +54,7 @@ function apply() {
   $('config').textContent = snippet
   $('feedback').textContent = role === 'student' ? 'Student preview: tutor-only controls are hidden.' : 'Tutor preview.'
 }
-for (const id of ['role','health','theme','grid','readonly','hideUi','themeToggle','gridControl']) {
+for (const id of ['role','health','theme','grid','readonly','hideUi','themeToggle','gridControl','animatedGifs','gifPlaying']) {
   $(id).addEventListener('change', apply)
 }
 $('copy').addEventListener('click', async () => {
