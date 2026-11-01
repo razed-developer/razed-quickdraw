@@ -438,6 +438,43 @@ export class Editor {
     this.store.transact(() => { for (const s of sel) this.store.update(s.id, { z: --z }) })
   }
 
+  // Move the selected block one position in the visual stack. Keep its
+  // internal order and never cross the highlighter/normal-shape boundary.
+  reorderSelection(direction) {
+    if (this.readonly || !this.selection.size || !['forward', 'backward'].includes(direction)) return
+    const groups = [this.shapesSorted().filter(s => s.type === 'highlight'),
+      this.shapesSorted().filter(s => s.type !== 'highlight')]
+    const updates = []
+    for (const group of groups) {
+      const selected = group.filter(s => this.selection.has(s.id))
+      if (!selected.length || selected.length === group.length) continue
+      const next = [...group]
+      if (direction === 'forward') {
+        for (let i = next.length - 2; i >= 0; i--) {
+          if (this.selection.has(next[i].id) && !this.selection.has(next[i + 1].id)) {
+            ;[next[i], next[i + 1]] = [next[i + 1], next[i]]
+          }
+        }
+      } else {
+        for (let i = 1; i < next.length; i++) {
+          if (this.selection.has(next[i].id) && !this.selection.has(next[i - 1].id)) {
+            ;[next[i], next[i - 1]] = [next[i - 1], next[i]]
+          }
+        }
+      }
+      if (next.every((s, i) => s.id === group[i].id)) continue
+      const base = Math.min(...group.map(s => s.z))
+      next.forEach((s, i) => {
+        if (s.z !== base + i) updates.push([s.id, base + i])
+      })
+    }
+    if (updates.length) this.store.transact(() => {
+      for (const [id, z] of updates) this.store.update(id, { z })
+    })
+  }
+  bringForward() { this.reorderSelection('forward') }
+  sendBackward() { this.reorderSelection('backward') }
+
   shapesSorted() {
     // highlighter lives under the ink, like on paper — highlights render
     // first (in their own z order), everything else above
