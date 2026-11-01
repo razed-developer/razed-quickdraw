@@ -637,7 +637,16 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
           quadrants:'M50 0V100 M0 50H100','top-split':'M0 50H100 M50 0V50',
           'bottom-split':'M0 50H100 M50 50V100','left-focus':'M50 0V100 M50 50H100',
           'right-focus':'M50 0V100 M0 50H50'}
-        return '<svg viewBox="0 0 100 100" width="65" height="65" aria-hidden="true"><rect x="2" y="2" width="96" height="96" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="'+paths[id]+'" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>'
+        // Positions correspond to regionAt() in regions.js, not visual reading order.
+        const labels={single:[[50,50,1]],vertical:[[25,50,1],[75,50,2]],
+          horizontal:[[50,25,1],[50,75,2]],
+          quadrants:[[25,25,1],[75,25,2],[25,75,3],[75,75,4]],
+          'top-split':[[25,25,1],[75,25,2],[50,75,3]],
+          'bottom-split':[[50,25,1],[25,75,2],[75,75,3]],
+          'left-focus':[[25,50,1],[75,25,2],[75,75,3]],
+          'right-focus':[[25,25,1],[25,75,2],[75,50,3]]}
+        const nums=labels[id].map(([x,y,n])=>'<text x="'+x+'" y="'+y+'" text-anchor="middle" dominant-baseline="central" font-size="16" fill="currentColor">'+n+'</text>').join('')
+        return '<svg viewBox="0 0 100 100" width="65" height="65" aria-hidden="true"><rect x="2" y="2" width="96" height="96" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="'+paths[id]+'" fill="none" stroke="currentColor" stroke-width="1.8"/>'+nums+'</svg>'
       }
       const patternSvg=id=>{
         const ink='#8995a5'
@@ -665,8 +674,10 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
         const gallery=el('div','qd-canvas-gallery')
         gallery.setAttribute('role','dialog')
         gallery.setAttribute('aria-label','Canvas settings')
-        gallery.style.cssText='position:absolute;z-index:60;pointer-events:auto;overflow:auto;background:var(--qd-panel,#fff);color:var(--qd-text,#222);border:1px solid #b5bac3;box-shadow:0 8px 28px #0003;padding:12px;box-sizing:border-box;'
+        gallery.style.cssText='position:absolute;z-index:60;pointer-events:auto;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;background:var(--qd-panel,#fff);color:var(--qd-text,#222);border:1px solid #b5bac3;box-shadow:0 8px 28px #0003;padding:12px;box-sizing:border-box;'
         ui.append(gallery)
+        // Wheel input must scroll this panel, never zoom or pan the board beneath.
+        gallery.addEventListener('wheel',e=>e.stopPropagation(),{passive:true})
         canvasPanel=gallery
         const positionGallery=()=>{
           if(canvasPanel!==gallery)return
@@ -694,6 +705,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
           gallery.append(g);return g
         }
         const draw=()=>{
+          const scrollPosition=gallery.scrollTop
           gallery.replaceChildren()
           const top=document.createElement('div');top.style.cssText='display:flex;align-items:center;justify-content:space-between;'
           const title=document.createElement('strong');title.textContent='Canvas settings'
@@ -721,7 +733,8 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
           }
           const bg=state.enabled?(state.backgrounds[selectedRegion]||{type:'solid'}):{type:({none:'solid',lines:'graph',ruled:'paper',dots:'dots',crosses:'crosses',iso:'iso'})[state.grid]||'solid'}
           const pg=tiles(root.clientWidth<400?2:4)
-          for(const [id,label] of Object.entries(patterns))cell(pg,label,patternSvg(id),bg.type===id,()=>{
+          const available=state.enabled?Object.entries(patterns):Object.entries(patterns).filter(([id])=>!['dark','custom'].includes(id))
+          for(const [id,label] of available)cell(pg,label,patternSvg(id),bg.type===id,()=>{
             if(state.enabled){
               const next=Array.from({length:counts[state.layout]},(_,i)=>state.backgrounds[i]||{type:'solid'})
               next[selectedRegion]=id==='custom'?{type:'custom',color:bg.color||'#d7e8f4'}:{type:id}
@@ -748,6 +761,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
           const reset=document.createElement('button');reset.textContent='Reset';reset.style.cssText=css+'padding:5px 10px'
           reset.onclick=()=>{save({enabled:false,layout:'quadrants',backgrounds:[],grid:'lines',boundaries:false});draw()}
           foot.append(boundary,reset);gallery.append(foot)
+          gallery.scrollTop=scrollPosition
         }
         draw()
       }
