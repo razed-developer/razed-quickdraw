@@ -17,7 +17,7 @@ small{color:#526b70}code{overflow-wrap:anywhere}
 <label><input type="checkbox" id="health" checked> Enable Board Health for tutors</label></fieldset><fieldset><legend>Appearance</legend>
 <label>Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
 <label>Grid <select id="grid"><option value="dots">Dots</option><option value="lines">Lines</option><option value="none">None</option></select></label></fieldset><fieldset><legend>Editor controls</legend><label><input type="checkbox" id="readonly"> Read-only mode</label><label><input type="checkbox" id="hideUi"> Hide toolbar</label><label><input type="checkbox" id="themeToggle" checked> Allow theme toggle</label><label><input type="checkbox" id="gridControl" checked> Allow grid control</label></fieldset>
-<button id="apply">Apply configuration</button> <button id="copy" type="button">Copy integration code</button><p id="feedback" role="status" aria-live="polite"></p>
+<button id="copy" type="button">Copy integration code</button><p id="feedback" role="status" aria-live="polite"></p>
 <p><small>Changing options updates the editor automatically while retaining the document. Tutor-only visibility here is a UI demonstration, not authorization.</small></p>
 <strong>Integration example</strong><pre id="config"></pre>
 <a href="/demo">Open collaboration lab</a>
@@ -57,7 +57,6 @@ function apply() {
 for (const id of ['role','health','theme','grid','readonly','hideUi','themeToggle','gridControl']) {
   $(id).addEventListener('change', apply)
 }
-$('apply').addEventListener('click', apply)
 $('copy').addEventListener('click', async () => {
   try { await navigator.clipboard.writeText(snippet); $('feedback').textContent = 'Integration example copied.' }
   catch { $('feedback').textContent = 'Clipboard unavailable. Select the example text to copy.' }
