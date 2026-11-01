@@ -1461,6 +1461,23 @@ export class Editor {
       } catch (e2) { console.warn('image import failed', e2) }
     }
   }
+  // Public entry point for image search providers and host applications.
+  // Importing a Blob uses the same asset/shape pipeline as local file upload.
+  async insertImageBlob(blob, { at, source } = {}) {
+    if (!(blob instanceof Blob) || !blob.type.startsWith('image/')) {
+      throw new TypeError('insertImageBlob expects an image Blob')
+    }
+    if (blob.size > 20 * 1024 * 1024) throw new RangeError('Image exceeds the 20 MB import limit')
+    const before = new Set(this.store.all().filter((r) => r.typeName === 'asset').map((r) => r.id))
+    await this.importImageBlobs([blob], at)
+    const asset = this.store.all().find((r) => r.typeName === 'asset' && !before.has(r.id))
+    if (!asset) throw new Error('Image could not be decoded or imported')
+    if (source && typeof source === 'object') {
+      const { provider, title, author, license, sourceUrl } = source
+      this.store.put({ ...asset, attribution: { provider, title, author, license, sourceUrl } })
+    }
+    return asset.id
+  }
   pickImage() {
     const input = document.createElement('input')
     input.type = 'file'
