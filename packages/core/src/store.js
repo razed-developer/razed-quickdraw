@@ -62,7 +62,7 @@ export class Store {
   has(id) { return this.records.has(id) }
   ids() { return [...this.records.keys()] }
   all() { return [...this.records.values()] }
-  shapes() { return this.all().filter((r) => r.typeName !== 'asset') }
+  shapes() { return this.all().filter((r) => r.typeName !== 'asset' && r.typeName !== 'board-settings') }
   asset(id) { const r = this.records.get(id); return r && r.typeName === 'asset' ? r : null }
   get size() { return this.records.size }
 
