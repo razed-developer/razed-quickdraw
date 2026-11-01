@@ -3,7 +3,7 @@ export const REGION_LAYOUTS = Object.freeze({
   vertical: 2, horizontal: 2, quadrants: 4,
   'top-split': 3, 'bottom-split': 3, 'left-focus': 3, 'right-focus': 3,
 })
-export const BACKGROUND_TYPES = Object.freeze(['solid','graph','dots','paper','dark','custom'])
+export const BACKGROUND_TYPES = Object.freeze(['solid','graph','dots','paper','crosses','iso','dark','custom'])
 export function regionAt(layout, x, y) {
   if (!(layout in REGION_LAYOUTS) || !Number.isFinite(x) || !Number.isFinite(y))
     throw new RangeError('Invalid layout or coordinates')
