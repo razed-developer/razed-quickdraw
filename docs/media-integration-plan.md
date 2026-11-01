@@ -21,3 +21,11 @@ Status: Phase 1 in progress (2026-10-31). Core whiteboard remains provider-agnos
 - Existing local file insertion and static canvas rendering must remain unchanged.
 - Search and import failures must be visible, not silent.
 - Confirm external media license and attribution handling before production.
+
+## Backlog: Board Health (requested 2026-11-01)
+- Compact, optional board-health indicator with Healthy / Getting Heavy / Performance Risk states.
+- First pass: count shapes and images, estimate stored image bytes and serialized synchronization payload sizes; show actual configured server limit, not a guessed threshold.
+- Distinguish board load from connection latency and rendering slowdown. Add measured render/latency signals after instrumentation.
+- Tutor-friendly explanations and warnings before oversized imports or sync messages.
+- Later: advisory-only Optimize Board with image compression preview and estimated savings. Never silently delete or degrade content.
+- Implement in Quickdraw core; host applications control visibility and permissions.
