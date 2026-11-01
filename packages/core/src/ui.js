@@ -276,7 +276,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     paletteLeft.append(customRow)
     if (typeof window.EyeDropper === 'function') {
       const eyedrop = el('button','qd-opt')
-      eyedrop.innerHTML = SVG('<path d="m2 22 6-6m4-4 7-7a2.12 2.12 0 0 0-3-3l-7 7m3 3-3-3m3 3-4 4m0 0 4 4m-4-4-4 4"/>')
+      eyedrop.innerHTML = SVG('<path d="m2 22 6-6 2 2-6 6H2v-4Zm8-8 7.8-7.8a2.8 2.8 0 0 0-4-4L6 10m4 4-4-4m4 4 4 4m-4-4 6-6"/>')
       eyedrop.classList.add('qd-eyedropper')
       eyedrop.title = 'Pick colour from screen'
       eyedrop.setAttribute('aria-label','Pick colour from screen')
@@ -371,7 +371,15 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       b.setAttribute('aria-label','Apply '+value)
       b.draggable=true
       b.addEventListener('dragstart',e=>{e.dataTransfer.setData('text/plain',value);e.dataTransfer.effectAllowed='copy'})
-      b.addEventListener('click',e=>{e.stopPropagation();applyColor(value)})
+      b.addEventListener('click',e=>{
+        e.stopPropagation()
+        // Do not rebuild the swatch DOM here: doing so destroys the button
+        // between the first and second click, preventing dblclick from firing.
+        picker.value=value
+        editor.setStyle('color',value)
+        p.querySelectorAll('.qd-dot').forEach(dot=>dot.classList.toggle('on',dot.style.getPropertyValue('--dot').toLowerCase()===value))
+        refresh()
+      })
       b.addEventListener('dblclick',e=>{e.stopPropagation();onEdit?.(value)})
       container.append(b)
       return b
