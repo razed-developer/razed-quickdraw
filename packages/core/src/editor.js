@@ -1567,8 +1567,20 @@ export class Editor {
       ctx.beginPath();ctx.rect(sx,sy,sw,sh);ctx.clip()
       ctx.fillStyle=background.type==='custom'?background.color:fills[background.type]||this.theme.background
       ctx.fillRect(sx,sy,sw,sh)
-      const grid=background.type==='graph'?'lines':background.type==='dots'?'dots':background.type==='paper'?'ruled':'none'
+      const grid=background.type==='graph'?'lines':background.type==='dots'?'dots':background.type==='paper'?'ruled':background.type==='crosses'?'crosses':background.type==='iso'?'iso':'none'
       if(grid!=='none')this._drawGrid(ctx,cam,w*dpr,h*dpr,dpr,grid)
+      ctx.restore()
+    }
+    if(this.showRegionBoundaries){
+      const originX=cam.x*cam.z*dpr,originY=cam.y*cam.z*dpr
+      ctx.save();ctx.strokeStyle='rgba(90,96,120,.55)';ctx.lineWidth=Math.max(1,dpr)
+      ctx.setLineDash([6*dpr,4*dpr])
+      for(const rect of regionRectangles(this.regions.layout,vp)){
+        const x=(rect.x+cam.x)*cam.z*dpr,y=(rect.y+cam.y)*cam.z*dpr
+        const rw=rect.w*cam.z*dpr,rh=rect.h*cam.z*dpr
+        if(Math.abs(rect.x)<.00001){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+rh);ctx.stroke()}
+        if(Math.abs(rect.y)<.00001){ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x+rw,y);ctx.stroke()}
+      }
       ctx.restore()
     }
   }
