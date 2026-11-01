@@ -104,6 +104,13 @@ export function mountContextMenu(editor, { enabled = true } = {}) {
     const hasSelection = editor.selection.size > 0
     if (hasSelection) {
       if (!editor.readonly) {
+        addSubmenu('Edit', [
+          ['Cut', () => { void editor.cutSelection() }],
+          ['Copy', () => { void editor.copySelection() }],
+          ['Paste', () => { void editor.pasteFromClipboard() }],
+          ['Duplicate', () => editor.duplicateSelection()],
+          ['Delete', () => editor.deleteSelection()],
+        ])
         if (editor.selection.size >= 2) {
           addSubmenu('Arrange', [
             ['Align left', () => editor.alignSelection('left')],
@@ -125,15 +132,9 @@ export function mountContextMenu(editor, { enabled = true } = {}) {
           ['Send to back', () => editor.sendToBack()],
         ])
         divider()
-        add('Cut', () => { void editor.cutSelection() }, 'Ctrl+X')
+      } else {
+        add('Copy', () => { void editor.copySelection() }, 'Ctrl+C')
       }
-      add('Copy', () => { void editor.copySelection() }, 'Ctrl+C')
-      if (!editor.readonly) {
-        add('Paste', () => { void editor.pasteFromClipboard() }, 'Ctrl+V')
-        add('Duplicate', () => editor.duplicateSelection(), 'Ctrl+D')
-        add('Delete', () => editor.deleteSelection(), 'Del')
-      }
-      divider()
       add('Select all', () => editor.selectAll(), 'Ctrl+A')
     } else {
       if (!editor.readonly) {
