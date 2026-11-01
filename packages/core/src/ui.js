@@ -610,108 +610,126 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
 
     if (opts.gridControl || opts.themeToggle) p.appendChild(el('i', 'qd-menu-div'))
     if (opts.gridControl) {
-      const SETTINGS_ID='quickdraw:board-settings:regions'
-      const layouts={single:'Single canvas',vertical:'Vertical split',horizontal:'Horizontal split',quadrants:'Four quadrants',
+      const ID='quickdraw:board-settings:regions'
+      const layouts={single:'Single',vertical:'Vertical',horizontal:'Horizontal',quadrants:'Quadrants',
         'top-split':'Top split','bottom-split':'Bottom split','left-focus':'Left focus','right-focus':'Right focus'}
       const counts={vertical:2,horizontal:2,quadrants:4,'top-split':3,'bottom-split':3,'left-focus':3,'right-focus':3}
-      const types={solid:'None',graph:'Lines',paper:'Ruled',dots:'Dots',crosses:'Crosses',iso:'Isometric',dark:'Dark',custom:'Custom colour'}
-      const existing=editor.store.get(SETTINGS_ID)
-      const state=existing?.typeName==='board-settings'?existing:{
-        id:SETTINGS_ID,typeName:'board-settings',enabled:editor.features.regions&&!!editor.regions,
-        layout:editor.regions?.layout||'quadrants',backgrounds:editor.regions?.backgrounds||[],
-        grid:editor.grid,boundaries:!!editor.showRegionBoundaries}
+      const patterns={solid:'None',graph:'Lines',paper:'Ruled',dots:'Dots',crosses:'Crosses',iso:'Isometric',dark:'Dark',custom:'Colour'}
+      const saved=editor.store.get(ID)
+      const state={id:ID,typeName:'board-settings',enabled:false,layout:'quadrants',backgrounds:[],
+        grid:editor.grid,boundaries:false,...(saved?.typeName==='board-settings'?saved:{})}
+      const css='font:inherit;cursor:pointer;border:1px solid #a9afb8;background:transparent;color:inherit;border-radius:3px;'
+      const cell=(parent,label,svg,selected,fn)=>{
+        const button=document.createElement('button');button.type='button'
+        button.style.cssText=css+'padding:5px;display:flex;flex-direction:column;gap:5px;align-items:center;min-width:0;'
+        if(selected){button.style.outline='2px solid #6674cf';button.style.outlineOffset='-2px';button.setAttribute('aria-pressed','true')}
+        button.innerHTML=svg
+        const caption=document.createElement('span');caption.textContent=label;caption.style.fontSize='11px'
+        button.append(caption);button.title=label
+        button.onclick=e=>{e.stopPropagation();fn()}
+        parent.append(button);return button
+      }
+      const layoutSvg=id=>{
+        const paths={single:'',vertical:'M50 0V100',horizontal:'M0 50H100',
+          quadrants:'M50 0V100 M0 50H100','top-split':'M0 50H100 M50 0V50',
+          'bottom-split':'M0 50H100 M50 50V100','left-focus':'M50 0V100 M50 50H100',
+          'right-focus':'M50 0V100 M0 50H50'}
+        return '<svg viewBox="0 0 100 100" width="65" height="65" aria-hidden="true"><rect x="2" y="2" width="96" height="96" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="'+paths[id]+'" fill="none" stroke="currentColor" stroke-width="1.8"/></svg>'
+      }
+      const patternSvg=id=>{
+        const ink='#8995a5'
+        let content=''
+        if(id==='graph')content='<path d="M12 0V48 M24 0V48 M36 0V48 M48 0V48 M0 12H64 M0 24H64 M0 36H64" />'
+        if(id==='paper')content='<path d="M0 10H64 M0 20H64 M0 30H64 M0 40H64"/>'
+        if(id==='dots'||id==='crosses')for(let x=8;x<64;x+=12)for(let y=8;y<48;y+=12)
+          content+=id==='dots'?'<circle cx="'+x+'" cy="'+y+'" r="1.3" fill="'+ink+'" stroke="none"/>':
+            '<path d="M'+(x-2)+' '+y+'h4 M'+x+' '+(y-2)+'v4"/>'
+        if(id==='iso')for(let x=-70;x<100;x+=22)content+='<path d="M'+x+' 0l80 48 M'+x+' 48l80 -48"/>'
+        const fill=id==='dark'?'#242933':id==='custom'?'#d7e8f4':'#f9fafb'
+        return '<svg viewBox="0 0 64 48" width="64" height="48" aria-hidden="true"><rect width="64" height="48" fill="'+fill+'"/><g stroke="'+ink+'" stroke-width=".7" fill="none">'+content+'</g></svg>'
+      }
       const save=patch=>{
-        const next={...state,...patch}
-        Object.assign(state,next)
-        editor.store.put({...next,id:SETTINGS_ID,typeName:'board-settings'})
-        apply(next)
+        Object.assign(state,patch)
+        editor.store.put({...state,backgrounds:state.backgrounds.map(x=>({...x}))})
       }
-      const apply=rec=>{
-        if(rec.enabled&&counts[rec.layout]) editor.setRegions(rec.layout,rec.backgrounds||[])
-        editor.setFeatures({regions:!!rec.enabled})
-        if(rec.grid&&GRID_IDS.includes(rec.grid))editor.setGrid(rec.grid)
-        editor.showRegionBoundaries=!!rec.boundaries
-        editor.requestRender()
-      }
-      const menuRow=(parent,label,value,click)=>{
-        const b=el('button','qd-menu-item')
-        b.style.width='100%'
-        b.innerHTML='<span class="qd-mi-label"></span><span class="qd-mi-value"></span>'
-        b.querySelector('.qd-mi-label').textContent=label
-        b.querySelector('.qd-mi-value').textContent=value||''
-        b.addEventListener('click',e=>{e.stopPropagation();click()})
-        parent.appendChild(b);return b
-      }
-      const rootRow=el('div','qd-menu-item qd-has-sub')
-      rootRow.setAttribute('role','button');rootRow.tabIndex=0
-      rootRow.innerHTML='<span class="qd-mi-label">Canvas</span><span class="qd-mi-chev">'+ICONS.chevronRight+'</span>'
-      const sub=el('div','qd-submenu')
-      sub.style.minWidth='220px'
-      const panel=(title,render)=>{
-        sub.replaceChildren()
-        menuRow(sub,'‹ Canvas','',()=>renderRoot())
-        const heading=el('div','qd-menu-row');heading.textContent=title;heading.style.fontWeight='600';sub.appendChild(heading)
-        render()
-      }
-      const renderRoot=()=>{
-        sub.replaceChildren()
-        menuRow(sub,'Layout',state.enabled?layouts[state.layout]:'Single canvas',()=>panel('Layout',()=>{
-          for(const [id,label] of Object.entries(layouts))
-            menuRow(sub,label,(id==='single'?!state.enabled:state.enabled&&state.layout===id)?'✓':'',()=>{
-              if(id==='single')save({enabled:false})
-              else save({enabled:true,layout:id,backgrounds:Array.from({length:counts[id]},(_,i)=>state.backgrounds?.[i]||{type:'solid'})})
-              renderRoot()
-            })
-        }))
-        menuRow(sub,'Backgrounds',state.enabled?'Per region':GRID_LABELS[state.grid||editor.grid],()=>panel('Backgrounds',()=>{
-          if(!state.enabled){
-            for(const id of GRID_IDS)menuRow(sub,GRID_LABELS[id],(state.grid||editor.grid)===id?'✓':'',()=>{
-              save({grid:id});renderRoot()
-            })
-          } else {
-            const backgrounds=Array.from({length:counts[state.layout]},(_,i)=>state.backgrounds?.[i]||{type:'solid'})
-            backgrounds.forEach((bg,i)=>menuRow(sub,'Region '+(i+1),types[bg.type]||bg.type,()=>panel('Region '+(i+1),()=>{
-              for(const [type,label] of Object.entries(types))menuRow(sub,label,bg.type===type?'✓':'',()=>{
-                const next=backgrounds.map(b=>({...b}))
-                next[i]=type==='custom'?{type,color:bg.color||'#d7e8f4'}:{type}
-                save({backgrounds:next});renderRoot()
-              })
-              if(bg.type==='custom'){
-                const input=el('input');input.type='color';input.value=bg.color||'#d7e8f4'
-                input.title='Region colour';input.style.margin='8px'
-                input.addEventListener('input',()=>{
-                  const next=backgrounds.map(b=>({...b}));next[i]={type:'custom',color:input.value}
-                  save({backgrounds:next})
-                });sub.appendChild(input)
-              }
-            })))
-          }
-        }))
-        menuRow(sub,'Show region boundaries',state.boundaries?'On':'Off',()=>{
-          save({boundaries:!state.boundaries});renderRoot()
-        })
-        menuRow(sub,'Reset to default','',()=>{
-          save({enabled:false,grid:'lines',boundaries:false,layout:'quadrants',backgrounds:[]});renderRoot()
-        })
-      }
-      renderRoot()
-      rootRow.appendChild(sub)
-      const open=()=>{
-        rootRow.classList.add('sub-open')
-        const rr=root.getBoundingClientRect(),br=rootRow.getBoundingClientRect()
-        sub.classList.toggle('qd-sub-left',br.right+sub.offsetWidth+12>rr.right)
-        const fitsDown=br.top-7+sub.offsetHeight<=rr.bottom-8
-        sub.style.top=fitsDown?'':'auto';sub.style.bottom=fitsDown?'':'-7px'
-      }
-      let timer
-      rootRow.addEventListener('mouseenter',()=>{clearTimeout(timer);open()})
-      rootRow.addEventListener('mouseleave',()=>{timer=setTimeout(()=>rootRow.classList.remove('sub-open'),180)})
-      rootRow.addEventListener('click',e=>{
+      const trigger=el('button','qd-menu-item')
+      trigger.innerHTML='<span class="qd-mi-ico">'+(GRID_ICONS[editor.grid]||'')+'</span><span class="qd-mi-label">Canvas settings</span><span class="qd-mi-chev">'+ICONS.chevronRight+'</span>'
+      p.append(trigger)
+      trigger.onclick=e=>{
         e.stopPropagation()
-        if(rootRow.classList.contains('sub-open'))rootRow.classList.remove('sub-open')
-        else open()
-      })
-      p.appendChild(rootRow)
+        // A single non-cascading panel replaces the old three-deep flyouts.
+        const previous=p.querySelector('.qd-canvas-gallery')
+        if(previous){previous.remove();return}
+        const gallery=el('div','qd-canvas-gallery')
+        gallery.style.cssText='position:absolute;z-index:50;width:min(350px,calc(100vw - 30px));max-height:min(74vh,630px);overflow:auto;background:var(--qd-panel,#fff);color:var(--qd-text,#222);border:1px solid #b5bac3;box-shadow:0 8px 28px #0003;padding:12px;box-sizing:border-box;'
+        gallery.style.left='0';gallery.style.bottom='100%'
+        p.append(gallery)
+        let selectedRegion=0
+        const heading=(title)=>{
+          const h=document.createElement('div');h.textContent=title;h.style.cssText='font-size:13px;font-weight:600;margin:8px 0';gallery.append(h)
+        }
+        const tiles=(cols)=>{
+          const g=document.createElement('div');g.style.cssText='display:grid;grid-template-columns:repeat('+cols+',minmax(0,1fr));gap:7px;'
+          gallery.append(g);return g
+        }
+        const draw=()=>{
+          gallery.replaceChildren()
+          const top=document.createElement('div');top.style.cssText='display:flex;align-items:center;justify-content:space-between;'
+          const title=document.createElement('strong');title.textContent='Canvas settings'
+          const done=document.createElement('button');done.textContent='Done';done.style.cssText=css+'padding:5px 10px'
+          done.onclick=e=>{e.stopPropagation();gallery.remove()}
+          top.append(title,done);gallery.append(top)
+          heading('Layout')
+          const lg=tiles(4)
+          for(const [id,label] of Object.entries(layouts))cell(lg,label,layoutSvg(id),id==='single'?!state.enabled:state.enabled&&state.layout===id,()=>{
+            if(id==='single')save({enabled:false})
+            else save({enabled:true,layout:id,backgrounds:Array.from({length:counts[id]},(_,i)=>state.backgrounds[i]||{type:'solid'})})
+            selectedRegion=0;draw()
+          })
+          heading(state.enabled?'Select a region':'Background')
+          if(state.enabled){
+            const count=counts[state.layout]||4
+            const preview=document.createElement('div')
+            preview.style.cssText='display:grid;grid-template-columns:repeat(2,1fr);gap:5px;margin-bottom:8px'
+            // Regions are selected by their numbered preview tiles, preserving geometry in the layout thumbnail above.
+            for(let i=0;i<count;i++){
+              const bg=state.backgrounds[i]||{type:'solid'}
+              cell(preview,'Region '+(i+1),patternSvg(bg.type),selectedRegion===i,()=>{selectedRegion=i;draw()})
+            }
+            gallery.append(preview)
+          }
+          const bg=state.enabled?(state.backgrounds[selectedRegion]||{type:'solid'}):{type:({none:'solid',lines:'graph',ruled:'paper',dots:'dots',crosses:'crosses',iso:'iso'})[state.grid]||'solid'}
+          const pg=tiles(4)
+          for(const [id,label] of Object.entries(patterns))cell(pg,label,patternSvg(id),bg.type===id,()=>{
+            if(state.enabled){
+              const next=Array.from({length:counts[state.layout]},(_,i)=>state.backgrounds[i]||{type:'solid'})
+              next[selectedRegion]=id==='custom'?{type:'custom',color:bg.color||'#d7e8f4'}:{type:id}
+              save({backgrounds:next})
+            }else{
+              const grid={solid:'none',graph:'lines',paper:'ruled',dots:'dots',crosses:'crosses',iso:'iso'}[id]
+              if(grid){save({grid});editor.setGrid(grid)}
+            }
+            draw()
+          })
+          if(state.enabled&&bg.type==='custom'){
+            const picker=document.createElement('input');picker.type='color';picker.value=bg.color||'#d7e8f4'
+            picker.title='Custom background colour'
+            picker.oninput=()=>{
+              const next=state.backgrounds.map(x=>({...x}));next[selectedRegion]={type:'custom',color:picker.value}
+              save({backgrounds:next})
+            };gallery.append(picker)
+          }
+          const foot=document.createElement('div');foot.style.cssText='display:flex;justify-content:space-between;align-items:center;margin-top:10px;gap:8px'
+          const boundary=document.createElement('label');boundary.textContent=' Show boundaries'
+          const checkbox=document.createElement('input');checkbox.type='checkbox';checkbox.checked=!!state.boundaries
+          checkbox.onchange=()=>save({boundaries:checkbox.checked})
+          boundary.prepend(checkbox)
+          const reset=document.createElement('button');reset.textContent='Reset';reset.style.cssText=css+'padding:5px 10px'
+          reset.onclick=()=>{save({enabled:false,layout:'quadrants',backgrounds:[],grid:'lines',boundaries:false});draw()}
+          foot.append(boundary,reset);gallery.append(foot)
+        }
+        draw()
+      }
     }
     if (opts.themeToggle) {
       segment('Theme', ['light', 'dark'], {
