@@ -1559,7 +1559,6 @@ export class Editor {
     const vp={x:-cam.x,y:-cam.y,w:w/cam.z,h:h/cam.z}
     const fills={solid:this.theme.background,graph:'#f9fbff',dots:this.theme.background,
       paper:'#fffdf5',dark:'#242933'}
-    const previousGrid=this.grid
     for(const rect of regionRectangles(this.regions.layout,vp)){
       const background=this.regions.backgrounds[rect.region]
       const sx=(rect.x+cam.x)*cam.z*dpr,sy=(rect.y+cam.y)*cam.z*dpr
@@ -1568,11 +1567,10 @@ export class Editor {
       ctx.beginPath();ctx.rect(sx,sy,sw,sh);ctx.clip()
       ctx.fillStyle=background.type==='custom'?background.color:fills[background.type]||this.theme.background
       ctx.fillRect(sx,sy,sw,sh)
-      this.grid=background.type==='graph'?'lines':background.type==='dots'?'dots':background.type==='paper'?'ruled':'none'
-      if(this.grid!=='none')this._drawGrid(ctx,cam,w*dpr,h*dpr,dpr)
+      const grid=background.type==='graph'?'lines':background.type==='dots'?'dots':background.type==='paper'?'ruled':'none'
+      if(grid!=='none')this._drawGrid(ctx,cam,w*dpr,h*dpr,dpr,grid)
       ctx.restore()
     }
-    this.grid=previousGrid
   }
 
   setRegions(layout, backgrounds=[]) {
@@ -1596,10 +1594,10 @@ export class Editor {
   // zoom. Spacing doubles or halves to stay in a comfortable band, and a new
   // level fades in as you zoom rather than popping into place.
   // W/H are device px; the ctx must be untransformed.
-  _drawGrid(ctx, cam, W, H, dpr) {
-    if (this.grid === 'none' || !(cam.z > 0)) return
+  _drawGrid(ctx, cam, W, H, dpr, grid = this.grid) {
+    if (grid === 'none' || !(cam.z > 0)) return
     // point-like marks (dots, crosses) carry less ink, so they use the darker ramp
-    const g = this.theme.grid?.[['dots', 'crosses'].includes(this.grid) ? 'dot' : 'line']
+    const g = this.theme.grid?.[['dots', 'crosses'].includes(grid) ? 'dot' : 'line']
     if (!g) return
     let step = GRID_STEP
     while (step * cam.z < 18) step *= 2
@@ -1616,11 +1614,11 @@ export class Editor {
     for (let m = m0, y = (m0 * step + cam.y) * z; y <= H; m++, y += step * z) rows.push([y, isMajor(m)])
 
     ctx.save()
-    if (this.grid === 'lines' || this.grid === 'ruled') {
+    if (grid === 'lines' || grid === 'ruled') {
       for (const major of [false, true]) {
         ctx.beginPath()
         // half-pixel offsets keep a 1px rule on one device pixel, not two
-        if (this.grid === 'lines') {
+        if (grid === 'lines') {
           for (const [x, m] of cols) if (m === major) { const p = Math.round(x) + 0.5; ctx.moveTo(p, 0); ctx.lineTo(p, H) }
         }
         for (const [y, m] of rows) if (m === major) { const p = Math.round(y) + 0.5; ctx.moveTo(0, p); ctx.lineTo(W, p) }
@@ -1629,7 +1627,7 @@ export class Editor {
         ctx.lineWidth = 1
         ctx.stroke()
       }
-    } else if (this.grid === 'crosses') {
+    } else if (grid === 'crosses') {
       // a small + at each intersection — the draughtsman's registration marks
       for (const major of [false, true]) {
         const arm = (major ? 4.5 : 3) * dpr
@@ -1648,7 +1646,7 @@ export class Editor {
         ctx.lineWidth = 1
         ctx.stroke()
       }
-    } else if (this.grid === 'iso') {
+    } else if (grid === 'iso') {
       // isometric weave: the two 30° diagonal families make a diamond lattice
       // that stays self-aligned at every zoom. One quiet weight — major
       // emphasis turns a woven field into noise.
