@@ -8,7 +8,7 @@ From the repository root:
 npm run dev:rooms --workspace=quickdraw-sync-example
 ```
 
-- `http://127.0.0.1:8081/feature-lab` — single-board SDK configuration playground.
+- `http://127.0.0.1:8081/feature-lab` — single-board SDK configuration playground with live role, appearance, and editor-control settings plus a copyable integration example.
 - `http://127.0.0.1:8081/demo` — two-participant collaborative room with image storage.
 
 ## Application roles, not room ownership
@@ -49,4 +49,4 @@ See [External Image Storage Integration](external-image-storage-integration.md).
 4. Add a two-participant test in the collaboration lab if synchronization or permissions are involved.
 5. Document how hosts enable it, what they must provide, and what stays local versus synchronized.
 
-The Feature Lab demonstrates UI configuration only. It does not simulate real authenticated users, storage authorization, or network performance.
+The Feature Lab recreates its editor on configuration changes while reusing the same document Store. The copied example assumes the host provides an authenticated `session.permissions.canViewBoardHealth` value; adapt that expression to your application. The Feature Lab demonstrates UI configuration only. It does not simulate real authenticated users, storage authorization, or network performance.
