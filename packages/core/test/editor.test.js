@@ -676,3 +676,23 @@ describe('keyboard help overlay', () => {
     c2.remove()
   })
 })
+
+describe('clipboard stacking', () => {
+  it('restores original coordinates and z order for cut shapes', () => {
+    const original = [
+      { id: 'cut-a', typeName: 'shape', type: 'geo', x: 10, y: 20, z: 2, rot: 0, props: { w: 30, h: 30 } },
+      { id: 'cut-b', typeName: 'shape', type: 'geo', x: 40, y: 50, z: 5, rot: 0, props: { w: 30, h: 30 } },
+    ]
+    editor._pasteShapes({ quickdraw: 1, cut: true, shapes: [...original].reverse(), assets: {} })
+    const pasted = [...editor.selection].map(id => editor.store.get(id)).sort((a, b) => a.z - b.z)
+    expect(pasted.map(s => [s.x, s.y, s.z])).toEqual([[10, 20, 2], [40, 50, 5]])
+    expect(pasted.every(s => !original.some(o => o.id === s.id))).toBe(true)
+  })
+  it('places ordinary copied shapes on top with an offset', () => {
+    const shape = { id: 'copy-a', typeName: 'shape', type: 'geo', x: 10, y: 20, z: 2, rot: 0, props: { w: 30, h: 30 } }
+    editor._pasteShapes({ quickdraw: 1, shapes: [shape], assets: {} })
+    const pasted = editor.store.get([...editor.selection][0])
+    expect([pasted.x, pasted.y]).toEqual([26, 36])
+    expect(pasted.z).toBeGreaterThan(shape.z)
+  })
+})
