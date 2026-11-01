@@ -1,3 +1,4 @@
+import { wikimediaCommonsProvider } from './media-providers.js'
 // The board's chrome: a floating dock of tools, a styles popover, and the
 // board menu — plain DOM, one implementation for every host framework.
 // The dock is responsive: tools overflow into a "more" flyout as the frame
@@ -95,7 +96,7 @@ const DOCK_NAMES = ['select', 'hand', 'draw', 'highlight', 'eraser', 'laser', 'l
 // what gives way first as the frame narrows (select and draw never yield)
 const DROP_ORDER = ['hand', 'laser', 'line', 'note', 'image', 'highlight', 'text', 'arrow', 'eraser', 'geo']
 
-export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gridControl = true } = {}) {
+export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gridControl = true, mediaProviders = [wikimediaCommonsProvider] } = {}) {
   const root = editor.container
   // menu switches the host can drop — an app that owns its own theme chrome
   // doesn't want a second control for it on the canvas
@@ -105,6 +106,8 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
 
   let popover = null // { name, el }
   let canvasPanel = null
+  let mediaPanel = null
+  const closeMediaPanel = () => { if (mediaPanel) { mediaPanel.controller.abort(); mediaPanel.el.remove(); mediaPanel = null } }
   const closeCanvasPanel = () => { if (canvasPanel) { canvasPanel.dispatchEvent(new Event('qd-close'));canvasPanel.remove();canvasPanel = null } }
   const closePopover = () => {
     if (popover) { popover.el.remove(); popover = null; refresh() }
@@ -113,6 +116,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     if (popover?.name === name) return closePopover()
     closePopover()
     closeCanvasPanel()
+    closeMediaPanel()
     const p = el('div', 'qd-popover')
     build(p)
     ui.appendChild(p)
@@ -129,9 +133,103 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     refresh()
   }
 
+  const openMediaPanel = () => {
+    closePopover(); closeCanvasPanel(); closeMediaPanel()
+    const controller = new AbortController()
+    const panel = el('div', 'qd-media-gallery')
+    panel.setAttribute('role', 'dialog')
+    panel.setAttribute('aria-label', 'Insert image')
+    panel.style.cssText = 'position:absolute;z-index:65;pointer-events:auto;overflow-y:auto;overscroll-behavior:contain;touch-action:pan-y;background:var(--qd-panel,#fff);color:var(--qd-text,#222);border:1px solid #b5bac3;box-shadow:0 8px 28px #0003;padding:12px;box-sizing:border-box;'
+    panel.addEventListener('wheel', e => e.stopPropagation(), { passive: true })
+    ui.append(panel)
+    mediaPanel = { el: panel, controller }
+    const position = () => {
+      if (mediaPanel?.el !== panel) return
+      const w = Math.min(410, Math.max(0, root.clientWidth - 16))
+      const h = Math.max(0, root.clientHeight - 16)
+      panel.style.width = w + 'px'
+      panel.style.maxHeight = h + 'px'
+      panel.style.left = Math.max(8, (root.clientWidth - w) / 2) + 'px'
+      panel.style.top = Math.max(8, (root.clientHeight - Math.min(panel.scrollHeight, h)) / 2) + 'px'
+    }
+    const observer = new ResizeObserver(position)
+    observer.observe(root)
+    controller.signal.addEventListener('abort', () => observer.disconnect(), { once: true })
+    const header = el('div')
+    header.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:8px;margin-bottom:10px'
+    const title = el('strong'); title.textContent = 'Insert image'
+    const done = el('button'); done.textContent = 'Done'; done.onclick = closeMediaPanel
+    header.append(title, done)
+    const form = el('form')
+    form.style.cssText = 'display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px'
+    const input = el('input'); input.type = 'search'; input.placeholder = 'Search images'; input.setAttribute('aria-label','Search images')
+    input.style.cssText = 'flex:1;min-width:120px;padding:7px'
+    const select = el('select'); select.setAttribute('aria-label','Image source')
+    for (const provider of mediaProviders) {
+      const opt = el('option'); opt.value = provider.id; opt.textContent = provider.label; select.append(opt)
+    }
+    const search = el('button'); search.type = 'submit'; search.textContent = 'Search'
+    const upload = el('button'); upload.type = 'button'; upload.textContent = 'Upload file'
+    upload.onclick = () => { closeMediaPanel(); editor.pickImage() }
+    form.append(input, select, search, upload)
+    const status = el('div'); status.setAttribute('role','status'); status.style.cssText = 'font-size:12px;margin:6px 0'
+    const results = el('div')
+    results.style.cssText = 'display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px'
+    let request = null
+    form.onsubmit = async e => {
+      e.preventDefault()
+      const query = input.value.trim()
+      if (!query) { status.textContent = 'Enter a search term.'; return }
+      request?.abort()
+      request = new AbortController()
+      const signal = request.signal
+      const provider = mediaProviders.find(p => p.id === select.value)
+      if (!provider) return
+      results.replaceChildren(); status.textContent = 'Searching…'
+      try {
+        const items = await provider.search(query, { signal })
+        if (signal.aborted || mediaPanel?.el !== panel) return
+        status.textContent = items.length ? items.length + ' images found. Select one to insert.' : 'No images found.'
+        for (const item of items) {
+          const tile = el('button'); tile.type = 'button'
+          tile.style.cssText = 'display:flex;flex-direction:column;gap:4px;min-width:0;padding:5px;cursor:pointer;border:1px solid #a9afb8;background:transparent;color:inherit'
+          const img = el('img'); img.src = item.thumbnailUrl; img.alt = item.title || 'Search result'
+          img.loading = 'lazy'; img.style.cssText = 'width:100%;height:95px;object-fit:contain'
+          const label = el('span'); label.textContent = item.title || 'Untitled image'
+          label.style.cssText = 'font-size:11px;overflow-wrap:anywhere'
+          const credit = el('span'); credit.textContent = [item.source?.author,item.source?.license].filter(Boolean).join(' · ') || 'Check source licence'
+          credit.style.cssText = 'font-size:10px;opacity:.7;overflow-wrap:anywhere'
+          tile.append(img,label,credit)
+          tile.onclick = async () => {
+            tile.disabled = true; status.textContent = 'Importing image…'
+            try {
+              const blob = await provider.getBlob(item, { signal: controller.signal })
+              if (controller.signal.aborted) return
+              await editor.insertImageBlob(blob, { source: item.source })
+              status.textContent = 'Image inserted.'
+              closeMediaPanel()
+            } catch (err) {
+              if (!controller.signal.aborted) status.textContent = 'Import failed: ' + err.message
+              tile.disabled = false
+            }
+          }
+          results.append(tile)
+        }
+        position()
+      } catch (err) {
+        if (!signal.aborted) status.textContent = 'Search failed: ' + err.message
+      }
+    }
+    panel.append(header, form, status, results)
+    status.textContent = mediaProviders.length ? 'Search an image source or upload a file.' : 'No search providers configured. Upload a file.'
+    position()
+    input.focus()
+    controller.signal.addEventListener('abort', () => request?.abort(), { once:true })
+  }
+
   // ---- actions -------------------------------------------------------------
   const run = (name, b) => {
-    if (name === 'image') { closePopover(); return editor.pickImage() }
+    if (name === 'image') { closePopover(); return openMediaPanel() }
     if (name === 'geo') return geoTap(b)
     if (name === 'draw' || name === 'highlight' || name === 'line' || name === 'arrow') {
       editor.setTool(name)
@@ -953,6 +1051,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       root.removeEventListener('pointerdown', closeOnCanvas, { capture: true })
       closeHelp()
       closeCanvasPanel()
+      closeMediaPanel()
       ui.remove()
     },
   }
