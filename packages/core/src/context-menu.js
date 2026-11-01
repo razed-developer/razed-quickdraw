@@ -104,9 +104,6 @@ export function mountContextMenu(editor, { enabled = true } = {}) {
     const hasSelection = editor.selection.size > 0
     if (hasSelection) {
       if (!editor.readonly) {
-        add('Duplicate', () => editor.duplicateSelection(), 'Ctrl+D')
-        add('Delete', () => editor.deleteSelection(), 'Del')
-        divider()
         addSubmenu('Reorder', [
           ['Bring to front', () => editor.bringToFront()],
           ['Bring forward', () => editor.bringForward()],
@@ -114,11 +111,23 @@ export function mountContextMenu(editor, { enabled = true } = {}) {
           ['Send to back', () => editor.sendToBack()],
         ])
         divider()
+        add('Cut', () => { void editor.cutSelection() }, 'Ctrl+X')
       }
+      add('Copy', () => { void editor.copySelection() }, 'Ctrl+C')
+      if (!editor.readonly) {
+        add('Paste', () => { void editor.pasteFromClipboard() }, 'Ctrl+V')
+        add('Duplicate', () => editor.duplicateSelection(), 'Ctrl+D')
+        add('Delete', () => editor.deleteSelection(), 'Del')
+      }
+      divider()
       add('Select all', () => editor.selectAll(), 'Ctrl+A')
     } else {
+      if (!editor.readonly) {
+        add('Paste', () => { void editor.pasteFromClipboard() }, 'Ctrl+V')
+        divider()
+      }
       add('Select all', () => editor.selectAll(), 'Ctrl+A')
-      if (typeof editor.fitToContent === 'function') add('Fit to content', () => editor.fitToContent())
+      if (typeof editor.fitContent === 'function') add('Fit to content', () => editor.fitContent({ animate: 220 }))
     }
     menu.style.display = 'block'
     menu.style.visibility = 'hidden'
