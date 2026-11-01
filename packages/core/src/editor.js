@@ -33,10 +33,16 @@ const bendMidpoint = (pr) => {
 }
 
 export class Editor {
-  constructor({ container, store, theme = 'light', grid = 'lines', readonly = false, camera, styles, geoKind, regions = null } = {}) {
+  constructor({ container, store, theme = 'light', grid = 'lines', readonly = false, camera, styles, geoKind, regions = null, features } = {}) {
     this.container = container
     this.store = store || new Store()
     this.theme = themeOf(theme)
+    // Omitted features preserve the legacy grid. Explicit feature settings
+    // allow hosts to opt into a plain canvas or infinite regions.
+    this.features = {
+      backgrounds: features?.backgrounds !== false,
+      regions: features?.regions === true,
+    }
     this.grid = GRID_IDS.includes(grid) ? grid : 'lines'
     this.regions = regions ? createRegionLayout(regions.layout, regions.backgrounds) : null
     this.readonly = !!readonly
@@ -1524,8 +1530,8 @@ export class Editor {
       ctx.clearRect(0, 0, w * dpr, h * dpr)
     }
     if (background) {
-      if (this.regions) this._drawRegionBackgrounds(ctx, cam, w, h, dpr)
-      else this._drawGrid(ctx, cam, w * dpr, h * dpr, dpr)
+      if (this.features.regions && this.regions) this._drawRegionBackgrounds(ctx, cam, w, h, dpr)
+      else if (this.features.backgrounds) this._drawGrid(ctx, cam, w * dpr, h * dpr, dpr)
     }
     ctx.setTransform(cam.z * dpr, 0, 0, cam.z * dpr, cam.x * cam.z * dpr, cam.y * cam.z * dpr)
     const vp = { x: -cam.x, y: -cam.y, w: w / cam.z, h: h / cam.z }
@@ -1576,6 +1582,13 @@ export class Editor {
 
   clearRegions() {
     this.regions=null
+    this.requestRender()
+  }
+
+  // Feature visibility never discards the stored region configuration.
+  setFeatures(features={}) {
+    if ('backgrounds' in features) this.features.backgrounds=features.backgrounds!==false
+    if ('regions' in features) this.features.regions=features.regions===true
     this.requestRender()
   }
 
