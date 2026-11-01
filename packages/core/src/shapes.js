@@ -215,10 +215,16 @@ export function assetImage(store, assetId, onReady) {
   cache.set(assetId, entry)
   img.onload = () => {
     entry.ready = true
-    for (const listener of entry.listeners) listener()
+    const listeners = [...entry.listeners]
     entry.listeners.clear()
+    for (const listener of listeners) listener()
   }
-  img.onerror = () => { entry.listeners.clear() }
+  img.onerror = () => {
+    // Keep the placeholder, but notify the board so the failed load can be observed.
+    const listeners = [...entry.listeners]
+    entry.listeners.clear()
+    for (const listener of listeners) listener()
+  }
   img.src = asset.src
   return null
 }
