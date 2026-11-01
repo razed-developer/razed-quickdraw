@@ -276,7 +276,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     paletteLeft.append(customRow)
     if (typeof window.EyeDropper === 'function') {
       const eyedrop = el('button','qd-opt')
-      eyedrop.innerHTML = SVG('<path d="m2 22 6-6 2 2-6 6H2v-4Zm8-8 7.8-7.8a2.8 2.8 0 0 0-4-4L6 10m4 4-4-4m4 4 4 4m-4-4 6-6"/>')
+      eyedrop.innerHTML = SVG('<path d="m2 22 6-6 4 4-6 6H2v-4Z"/><path d="m9 15 7.9-7.9a3 3 0 0 0-4.2-4.2L4.8 10.8"/><path d="m8 8 8 8"/><path d="m14 5 5 5"/>')
       eyedrop.classList.add('qd-eyedropper')
       eyedrop.title = 'Pick colour from screen'
       eyedrop.setAttribute('aria-label','Pick colour from screen')
@@ -342,9 +342,6 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       const input=document.createElement('input')
       input.type='color';input.value=value
       input.title='Choose replacement colour'
-      const preview=el('span','qd-palette-swatch-value')
-      preview.textContent=value.toUpperCase()
-      input.addEventListener('input',()=>{preview.textContent=input.value.toUpperCase()})
       const done=icon('save','Save changed colour',()=>{
         const replacement=input.value.toLowerCase()
         const index=target.indexOf(value)
@@ -360,7 +357,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
       })
       const cancel=icon('x','Cancel editing',()=>editorRow.remove())
       cancel.textContent='×'
-      editorRow.append(input,preview,done,remove,cancel)
+      editorRow.append(input,done,remove,cancel)
       container.append(editorRow)
       input.focus()
     }
