@@ -1402,34 +1402,32 @@ export class Editor {
   }
 
   // ---- clipboard / images --------------------------------------------------
-  async copySelection() {
+  async copySelection({ cut = false } = {}) {
     if (!this.selection.size) return false
-    const shapes = []
+    const shapes = this.shapesSorted().filter(s => this.selection.has(s.id))
     const assets = {}
-    for (const id of this.selection) {
-      const s = this.store.get(id)
-      if (!s) continue
-      shapes.push(s)
+    for (const s of shapes) {
       if (s.type === 'image' && s.props.assetId) {
         const a = this.store.asset(s.props.assetId)
         if (a) assets[a.id] = a
       }
     }
     try {
-      await navigator.clipboard.writeText(JSON.stringify({ quickdraw: 1, shapes, assets }))
+      await navigator.clipboard.writeText(JSON.stringify({ quickdraw: 1, shapes, assets, ...(cut ? { cut: true } : {}) }))
       return true
     } catch (e) { console.warn('board copy failed', e); this.emit('clipboard-error', { action: 'copy', error: e }); return false }
   }
   async cutSelection() {
     if (this.readonly || !this.selection.size) return false
     const ids = [...this.selection]
-    if (!(await this.copySelection())) return false
+    if (!(await this.copySelection({ cut: true }))) return false
     const remaining = ids.filter(id => this.store.has(id))
     if (remaining.length) this.store.remove(remaining)
     this.setSelection([])
     return true
   }
   async pasteFromClipboard() {
+    if (this.readonly) return
     // images first, then our own shape payloads
     try {
       if (navigator.clipboard.read) {
@@ -1453,6 +1451,10 @@ export class Editor {
   _pasteShapes(data) {
     let z = this.store.maxZ()
     const ids = []
+    // Cut retains its original layer indices and coordinates. Copy creates
+    // offset duplicates on top. New IDs prevent collisions across boards.
+    const restore = data.cut === true
+    const ordered = [...data.shapes].sort((a, b) => a.z - b.z || a.id.localeCompare(b.id))
     this.store.transact(() => {
       const assetMap = {}
       for (const a of Object.values(data.assets || {})) {
@@ -1460,11 +1462,13 @@ export class Editor {
         assetMap[a.id] = nid
         this.store.put({ ...a, id: nid })
       }
-      for (const s of data.shapes) {
+      for (const s of ordered) {
         const nid = newId()
         ids.push(nid)
         this.store.put({
-          ...s, id: nid, x: s.x + 16, y: s.y + 16, z: ++z,
+          ...s, id: nid,
+          x: s.x + (restore ? 0 : 16), y: s.y + (restore ? 0 : 16),
+          z: restore ? s.z : ++z,
           props: s.props.assetId ? { ...s.props, assetId: assetMap[s.props.assetId] || s.props.assetId } : s.props,
         })
       }
