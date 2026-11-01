@@ -217,6 +217,11 @@ function start() {
         },
       },
       ...(validColour ? { styles: { color: savedColour } } : {}) })
+    cameraCleanups.push(board.editor.on('asset-error', ({message}) => {
+      const notice = document.getElementById('notice')
+      notice.textContent = 'Image import failed: ' + message
+      notice.setAttribute('role', 'alert')
+    }))
     cameraCleanups.push(board.editor.on('camera',()=>{
       try {localStorage.setItem(cameraKey,JSON.stringify(board.editor.camera))} catch { /* storage unavailable */ }
     }))
