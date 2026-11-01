@@ -579,32 +579,19 @@ describe('createQuickdraw UI', () => {
     expect(board.editor.theme.id).toBe('dark')
     expect(btns('Theme')[1].classList.contains('on')).toBe(true)
 
-    // grid is a nested dropdown: the row shows the current value…
-    expect(board.editor.grid).toBe('lines')
-    const gridRow = c2.querySelector('.qd-has-sub')
-    expect(gridRow.textContent).toContain('Grid')
-    expect(gridRow.textContent).toContain('Lines')
-    expect(gridRow.classList.contains('sub-open')).toBe(false)
-    gridRow.click()
-    expect(gridRow.classList.contains('sub-open')).toBe(true)
-    // …and the flyout lists every backdrop with a check on the current one
-    const options = [...gridRow.querySelectorAll('.qd-submenu .qd-menu-item')]
-    expect(options.length).toBe(6)
-    expect(options[1].querySelector('.qd-mi-check').innerHTML).not.toBe('')
-    options[0].click()
-    expect(board.editor.grid).toBe('none')
-    options[3].click()
+    // Canvas settings replaced the old nested Grid menu.
+    const canvasTrigger = [...c2.querySelectorAll('.qd-menu-item')]
+      .find((row) => row.textContent.includes('Canvas settings'))
+    expect(canvasTrigger).toBeTruthy()
+    canvasTrigger.click()
+    const gallery = c2.querySelector('.qd-canvas-gallery')
+    expect(gallery).toBeTruthy()
+    expect(gallery.getAttribute('aria-label')).toBe('Canvas settings')
+    expect(gallery.textContent).toContain('Background')
+    const dots = [...gallery.querySelectorAll('button')].find((button) => button.title === 'Dots')
+    expect(dots).toBeTruthy()
+    dots.click()
     expect(board.editor.grid).toBe('dots')
-    options[5].click()
-    expect(board.editor.grid).toBe('iso')
-    // picking keeps the flyout open and refreshes the check + parent value
-    expect(gridRow.classList.contains('sub-open')).toBe(true)
-    expect(options[5].querySelector('.qd-mi-check').innerHTML).not.toBe('')
-    expect(options[1].querySelector('.qd-mi-check').innerHTML).toBe('')
-    expect(gridRow.querySelector('.qd-mi-value').textContent).toBe('Isometric')
-    // tapping the parent row again folds the flyout
-    gridRow.click()
-    expect(gridRow.classList.contains('sub-open')).toBe(false)
 
     board.destroy()
     c2.remove()
@@ -620,7 +607,7 @@ describe('createQuickdraw UI', () => {
     board.ui.setOptions({ gridControl: true })
     c2.querySelector('.qd-dock button[data-name="menu"]').click()
     const gridRow = [...c2.querySelectorAll('.qd-menu-item')]
-      .find((r) => r.textContent.trim().startsWith('Grid'))
+      .find((r) => r.textContent.trim().startsWith('Canvas settings'))
     expect(gridRow).toBeTruthy()
     expect(c2.querySelectorAll('.qd-menu-row').length).toBe(0) // theme still off
     board.destroy()
