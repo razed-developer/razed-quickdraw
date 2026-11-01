@@ -3,6 +3,7 @@
 // plain web page: every module is dependency-free ESM.
 
 export { Editor, TOOLS } from './editor.js'
+export { measureBoardHealth, mountBoardHealth } from './board-health.js'
 export { wikimediaCommonsProvider, createPixabayProvider } from './media-providers.js'
 export { REGION_LAYOUTS, BACKGROUND_TYPES, regionAt, regionRectangles, validateRegionBackground, createRegionLayout } from './regions.js'
 export { Store, newId, isDiffEmpty, invertDiff, composeDiff } from './store.js'
@@ -17,6 +18,7 @@ export { strokeOutline } from './freehand.js'
 
 import { Editor } from './editor.js'
 import { buildUI } from './ui.js'
+import { mountBoardHealth } from './board-health.js'
 
 // The "made with Quickdraw" mark in the board's corner. It stays up when the
 // toolbar is hidden — hosts building their own chrome still credit the
@@ -52,10 +54,12 @@ export function createQuickdraw(opts) {
     mediaProviders: opts.mediaProviders,
   })
   const watermark = opts.watermark === false ? null : buildWatermark(editor)
+  const health = mountBoardHealth(editor, { enabled: opts.boardHealth === true })
   return {
     editor,
     ui,
     destroy() {
+      health.destroy()
       watermark?.remove()
       ui.destroy()
       editor.destroy()
