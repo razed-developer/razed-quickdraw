@@ -32,12 +32,15 @@ export function mountBoardHealth(editor, { enabled = true } = {}) {
   const root = editor.container
   const details = document.createElement('details')
   details.className = 'qd-board-health'
-  details.style.cssText = 'position:absolute;bottom:12px;right:12px;z-index:12;background:#fff;color:#183638;border:1px solid #a9bdbe;box-shadow:0 2px 8px #0002;padding:6px 9px;font:12px system-ui;max-width:min(290px,75%);'
+  details.style.cssText = 'position:absolute;top:12px;right:12px;z-index:12;background:#fff;color:#183638;border:1px solid #a9bdbe;box-shadow:0 2px 8px #0002;padding:6px 9px;font:12px system-ui;max-width:min(290px,75%);'
   const summary = document.createElement('summary')
   summary.style.cssText = 'cursor:pointer;font-weight:600'
   const body = document.createElement('div')
   body.style.cssText = 'padding-top:8px;line-height:1.65'
   details.append(summary, body)
+  details.addEventListener('click', (event) => {
+    if (details.open && !summary.contains(event.target)) details.open = false
+  })
   root.append(details)
   const format = n => (n / (1024 * 1024)).toFixed(2) + ' MB'
   const update = () => {
