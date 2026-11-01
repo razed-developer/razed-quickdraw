@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Razed Quickdraw · Feature Lab</title><link rel="stylesheet" href="/core/quickdraw.css">
+<style>
+*{box-sizing:border-box}body{margin:0;font:14px system-ui;background:#e8efef;color:#173338}
+header{padding:14px 18px;background:#173338;color:white}h1{font-size:20px;margin:0}p{margin:5px 0}
+main{display:grid;grid-template-columns:260px minmax(0,1fr);gap:12px;padding:12px;height:calc(100vh - 75px)}
+aside{background:white;border:1px solid #a9c0bf;padding:14px;overflow:auto}aside label{display:block;margin:12px 0}aside button{padding:8px;cursor:pointer}
+#board{position:relative;background:white;border:1px solid #a9c0bf;min-height:400px}
+small{color:#526b70}code{overflow-wrap:anywhere}
+@media(max-width:700px){main{grid-template-columns:1fr;height:auto}#board{height:65vh}}
+</style></head><body>
+<header><h1>Razed Quickdraw · Feature Lab</h1><p>Experiment with local SDK options. This page is not a collaborative room.</p></header>
+<main><aside>
+<strong>Participant configuration</strong>
+<label>Role <select id="role"><option value="tutor">Tutor</option><option value="student">Student</option></select></label>
+<label><input type="checkbox" id="health" checked> Enable Board Health for tutors</label>
+<label>Theme <select id="theme"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+<label>Grid <select id="grid"><option value="dots">Dots</option><option value="lines">Lines</option><option value="none">None</option></select></label>
+<button id="apply">Apply configuration</button>
+<p><small>Applying options recreates the editor while retaining its document snapshot. Tutor-only visibility here is a UI demonstration, not authorization.</small></p>
+<strong>Current configuration</strong><pre id="config"></pre>
+<a href="/demo">Open collaboration lab</a>
+</aside><div id="board"></div></main>
+<script type="module">
+import { createQuickdraw, Store } from '/core/index.js'
+const $ = id => document.getElementById(id)
+let board
+let store = new Store()
+function apply() {
+  if (board) board.destroy()
+  $('board').replaceChildren()
+  const role = $('role').value
+  const boardHealth = role === 'tutor' && $('health').checked
+  const options = { container: $('board'), store, theme: $('theme').value, grid: $('grid').value, boardHealth, watermark: false }
+  board = createQuickdraw(options)
+  $('config').textContent = JSON.stringify({ role, boardHealth, theme: options.theme, grid: options.grid }, null, 2)
+}
+$('apply').addEventListener('click', apply)
+apply()
+</script></body></html>
