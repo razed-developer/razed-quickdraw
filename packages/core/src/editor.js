@@ -414,6 +414,33 @@ export class Editor {
       }
     })
   }
+  distributeSelection(axis) {
+    if (this.readonly || this.selection.size < 3 || !['horizontal', 'vertical'].includes(axis)) return
+    const horizontal = axis === 'horizontal'
+    const items = [...this.selection].map(id => this.store.get(id)).filter(Boolean)
+      .map(shape => ({ shape, bounds: pageBounds(shape) }))
+    if (items.length < 3) return
+    const start = item => horizontal ? item.bounds.x : item.bounds.y
+    const size = item => horizontal ? item.bounds.w : item.bounds.h
+    items.sort((a, b) => start(a) - start(b) || a.shape.id.localeCompare(b.shape.id))
+    const first = items[0], last = items[items.length - 1]
+    const available = start(last) - (start(first) + size(first))
+      - items.slice(1, -1).reduce((sum, item) => sum + size(item), 0)
+    const gap = available / (items.length - 1)
+    let cursor = start(first) + size(first) + gap
+    const updates = []
+    for (const item of items.slice(1, -1)) {
+      const delta = cursor - start(item)
+      if (Math.abs(delta) > 0.000001) {
+        updates.push([item.shape.id, horizontal
+          ? { x: item.shape.x + delta } : { y: item.shape.y + delta }])
+      }
+      cursor += size(item) + gap
+    }
+    if (updates.length) this.store.transact(() => {
+      for (const [id, patch] of updates) this.store.update(id, patch)
+    })
+  }
   deleteSelection() {
     if (!this.selection.size) return
     this.store.remove([...this.selection])
