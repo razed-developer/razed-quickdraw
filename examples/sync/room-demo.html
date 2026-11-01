@@ -23,6 +23,13 @@ button{cursor:pointer;padding:7px 10px}
 @media(max-width:850px){main{grid-template-columns:1fr}.board{height:50vh}}
 #recovery{margin-top:12px;background:#fff;border:2px solid #b07824;padding:14px;display:none}
 #recovery button{margin:5px}
+.layout-lab{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:10px 12px;margin-bottom:12px;background:white;border:1px solid #aabfc0}
+.layout-lab label{display:inline-flex;align-items:center;gap:6px}
+.layout-lab select,.layout-lab input{padding:5px}
+.layout-lab input[type=color]{padding:1px;width:36px;height:30px}
+#region-options{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+#region-options label{font-size:12px}
+.layout-lab small{color:#52666a}
 </style>
 </head>
 <body>
@@ -32,6 +39,17 @@ button{cursor:pointer;padding:7px 10px}
 <div><label>Room <input id="room" value="demo" maxlength="64"></label>
 <button id="restart">Connect room</button></div>
 </header>
+<div class="layout-lab" aria-label="Canvas region layout preview">
+<label><input id="regions-enabled" type="checkbox"> Enable regions</label>
+<label>Layout <select id="region-layout">
+<option value="vertical">Vertical split</option><option value="horizontal">Horizontal split</option>
+<option value="quadrants" selected>Four quadrants</option>
+<option value="top-split">Top split</option><option value="bottom-split">Bottom split</option>
+<option value="left-focus">Left focus</option><option value="right-focus">Right focus</option>
+</select></label>
+<div id="region-options"></div>
+<small>Preview only · applies to both boards · not synchronized to the room</small>
+</div>
 <main>
 <section><h2>Participant A · <span class="status" id="status-a">connecting</span></h2><div id="board-a" class="board"></div><button id="follow-a">Follow B: Off</button><button id="call-a">Call B here</button><p id="invite-a"></p></section>
 <section><h2>Participant B · <span class="status" id="status-b">connecting</span></h2><div id="board-b" class="board"></div><button id="follow-b">Follow A: Off</button><button id="call-b">Call A here</button><p id="invite-b"></p></section>
@@ -48,6 +66,59 @@ const cameras = {a:null,b:null}
 const presence = {a:null,b:null}
 let cameraCleanups = []
 let activeRecovery = null
+const REGION_COUNTS={vertical:2,horizontal:2,quadrants:4,'top-split':3,'bottom-split':3,'left-focus':3,'right-focus':3}
+const REGION_TYPES=['solid','graph','dots','paper','dark','custom']
+const regionSettings={layout:'quadrants',backgrounds:[]}
+const regionOptions=document.getElementById('region-options')
+const regionsEnabled=document.getElementById('regions-enabled')
+const layoutSelect=document.getElementById('region-layout')
+function regionBackgrounds(){
+  const count=REGION_COUNTS[regionSettings.layout]
+  return Array.from({length:count},(_,i)=>regionSettings.backgrounds[i]||{type:'solid'})
+}
+function applyRegionPreview(){
+  const enabled=regionsEnabled.checked
+  for(const board of boards){
+    board.editor.setRegions(regionSettings.layout,regionBackgrounds())
+    board.editor.setFeatures({regions:enabled})
+  }
+}
+function rebuildRegionControls(){
+  regionOptions.replaceChildren()
+  regionSettings.backgrounds=regionBackgrounds()
+  regionOptions.hidden=!regionsEnabled.checked
+  layoutSelect.disabled=!regionsEnabled.checked
+  if(!regionsEnabled.checked)return
+  regionSettings.backgrounds.forEach((background,i)=>{
+    const label=document.createElement('label')
+    label.textContent='Region '+(i+1)
+    const select=document.createElement('select')
+    for(const type of REGION_TYPES){
+      const option=document.createElement('option');option.value=type;option.textContent=type
+      select.append(option)
+    }
+    select.value=background.type
+    const picker=document.createElement('input')
+    picker.type='color';picker.value=background.color||'#d7e8f4'
+    picker.title='Custom region colour'
+    picker.hidden=background.type!=='custom'
+    select.onchange=()=>{
+      regionSettings.backgrounds[i]=select.value==='custom'
+        ?{type:'custom',color:picker.value}:{type:select.value}
+      picker.hidden=select.value!=='custom'
+      applyRegionPreview()
+    }
+    picker.oninput=()=>{
+      regionSettings.backgrounds[i]={type:'custom',color:picker.value}
+      applyRegionPreview()
+    }
+    label.append(select,picker);regionOptions.append(label)
+  })
+}
+regionsEnabled.onchange=()=>{rebuildRegionControls();applyRegionPreview()}
+layoutSelect.onchange=()=>{regionSettings.layout=layoutSelect.value;regionSettings.backgrounds=[];rebuildRegionControls();applyRegionPreview()}
+rebuildRegionControls()
+
 const recoveryPanel = document.getElementById('recovery')
 function hideRecovery(){ recoveryPanel.style.display='none'; activeRecovery=null; document.getElementById('record-conflicts').replaceChildren() }
 function downloadSnapshot(snapshot){ const blob=new Blob([JSON.stringify(snapshot,null,2)],{type:'application/json'});const href=URL.createObjectURL(blob);const a=document.createElement('a');a.href=href;a.download='quickdraw-local-backup-'+Date.now()+'.json';a.click();setTimeout(()=>URL.revokeObjectURL(href),1000) }
@@ -110,6 +181,8 @@ function start() {
     }
     cameraCleanups.push(board.editor.on('styles', saveColour))
     boards.push(board)
+    board.editor.setRegions(regionSettings.layout,regionBackgrounds())
+    board.editor.setFeatures({regions:regionsEnabled.checked})
     const layer=document.createElement('div')
     layer.className='presence-layer'
     layer.setAttribute('aria-label','Other participant viewport')
