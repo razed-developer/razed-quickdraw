@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url'
 import { WebSocket, WebSocketServer } from 'ws'
 import { Store } from '../../packages/core/src/store.js'
 
-const MAX_MESSAGE_BYTES = 1024 * 1024
+const MAX_MESSAGE_BYTES = 24 * 1024 * 1024
 const ROOM_PATTERN = /^[a-zA-Z0-9_-]{1,64}$/
 
 export function createRoomSyncServer({ dataDir = resolve(dirname(fileURLToPath(import.meta.url)), '.room-data') } = {}) {
@@ -66,6 +66,7 @@ export function createRoomSyncServer({ dataDir = resolve(dirname(fileURLToPath(i
 
   wss.on('connection', socket => {
     let joined = null
+    socket.on('error', error => { console.warn('Room socket error:', error.code || error.message) })
     socket.on('message', (bytes, binary) => {
       if (binary) { socket.close(1003, 'JSON only'); return }
       let msg
