@@ -209,6 +209,7 @@ function start() {
     }
     const board = createQuickdraw({ container: boardElement, theme:'light', grid:'dots', watermark:false,
       camera:initialCamera,
+      boardHealth:true,
       assetStorage: {
         async upload(blob) {
           const response = await fetch('/api/assets', { method: 'POST', headers: { 'Content-Type': blob.type }, body: blob })
