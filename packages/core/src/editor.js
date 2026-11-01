@@ -1472,7 +1472,11 @@ export class Editor {
         this.setTool('select')
         this.setSelection([shapeId])
         if (at) { at = { x: at.x + 24, y: at.y + 24 } }
-      } catch (e2) { console.warn('image import failed', e2) }
+      } catch (error) {
+        console.warn('image import failed', error)
+        this.emit('asset-error', { message: error?.message || 'Image import failed', error })
+        throw error
+      }
     }
   }
   // Public entry point for image search providers and host applications.
