@@ -61,6 +61,7 @@ export function createQuickdraw(opts) {
   return {
     editor,
     ui,
+    gifs,
     destroy() {
       gifs.destroy()
       health.destroy()
