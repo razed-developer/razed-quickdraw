@@ -179,7 +179,7 @@ export function buildUI(editor, { hidden = false, onSave, themeToggle = true, gr
     form.onsubmit = async e => {
       e.preventDefault()
       const query = input.value.trim()
-      if (!query) { status.textContent = 'Enter a search term.'; return }
+      if (!query && select.value !== 'skimage') { status.textContent = 'Enter a search term.'; return }
       request?.abort()
       request = new AbortController()
       const signal = request.signal
